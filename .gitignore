@@ -1,0 +1,9 @@
+dane/
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+dist-win/
+*.AppImage
+*.log

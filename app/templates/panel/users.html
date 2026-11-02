@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs, initials with context %}
+{% block title %}Użytkownicy{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Użytkownicy</h1><p class="sub">Kont: {{ users|length }}</p></div>
+  <div class="page-actions"><a class="btn btn-primary" href="/panel/uzytkownicy/nowy">{{ icon("plus") }}Nowe konto</a></div></div>
+{{ panel_tabs("users") }}
+<div class="card table-wrap">
+  <table class="table resp">
+    <thead><tr><th>Konto</th><th>Rola</th><th>Uprawnienia</th><th>Pracownik</th><th>Ostatnie logowanie</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+    <tr>
+      <td><div class="row" style="flex-wrap:nowrap"><span class="avatar">{{ initials(u.full_name or u.username) }}</span>
+        <span><strong>{{ u.username }}</strong><br><span class="muted xs">{{ u.full_name or "" }}{% if u.phone %} · {{ u.phone }}{% endif %}</span></span></div></td>
+      <td data-l="Rola">{% if u.role == "owner" %}<span class="pill pill-owner">{{ icon("shield") }}Właściciel{% if u.is_primary %} główny{% endif %}</span>{% else %}<span class="pill">Użytkownik</span>{% endif %}
+        {% if not u.active %}<span class="pill pill-off">wyłączone</span>{% endif %}{% if u.locked %}<span class="pill pill-off">{{ icon("lock") }}zablokowane</span>{% endif %}{% if u.must_change_password %}<span class="pill">hasło tymczasowe</span>{% endif %}</td>
+      <td data-l="Uprawnienia" class="small">{% if u.role == "owner" %}pełny dostęp{% else %}
+        {% set ns = namespace(any=false) %}
+        {% for m, acts in u.perms.items() %}{% if acts.view %}{% set ns.any = true %}<div class="m-{{ m }}"><span class="mtag">{{ MODULES[m].label }}</span>
+          <span class="xs muted">{% for a, lbl in ACTIONS.items() if acts[a] %}{{ lbl|lower }}{% if not loop.last %}, {% endif %}{% endfor %}</span></div>{% endif %}{% endfor %}
+        {% if not ns.any %}<span class="muted">brak – tylko własne terminy</span>{% endif %}{% endif %}</td>
+      <td data-l="Pracownik">{{ u.employee_name or "—" }}</td>
+      <td data-l="Ostatnie logowanie" class="small">{{ u.last_login[:16] if u.last_login else "nigdy" }}</td>
+      <td><a class="btn btn-sm" href="/panel/uzytkownicy/{{ u.id }}">{{ icon("edit") }}Edytuj</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

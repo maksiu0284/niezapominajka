@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, errors_box with context %}
+{% block title %}Oznacz jako wykonane{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/terminy/{{ term.id }}">{{ term.display_title }}</a></div>
+<div class="page-head"><div><h1>Oznacz jako wykonane</h1><p class="sub">{{ term.display_title }} · {{ term.object_name }} · termin {{ term.due_date|d }}</p></div></div>
+
+<form method="post" action="/terminy/{{ term.id }}/wykonane" enctype="multipart/form-data" class="card card-pad form" style="max-width:720px"
+      data-done-form data-iv="{{ term.interval_value or '' }}" data-iu="{{ term.interval_unit or '' }}" data-base="{{ base_mode }}" data-due="{{ term.due_date }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {{ errors_box(errors) }}
+  <div class="form-grid">
+    <div class="field"><label for="done_date">Data wykonania <span class="req">*</span></label>
+      <input type="date" name="done_date" id="done_date" value="{{ today }}" max="{{ today }}" required></div>
+    <div class="field full"><label for="done_note">Notatka</label>
+      <textarea name="done_note" id="done_note" rows="2" placeholder="np. wynik badania, nr faktury, przebieg"></textarea></div>
+  </div>
+  <div class="recur-box stack">
+    <label class="check"><input type="checkbox" name="plan_next" value="1" id="plan_next" {{ 'checked' if next_date or term.recurring }} data-plan-next>
+      <span><strong>Zaplanuj kolejny termin</strong>{% if term.recurring %}<br><span class="muted xs">Cykl: co {{ term.interval_value }} {{ UNITS[term.interval_unit] }}, liczony od {{ "daty terminu" if base_mode == "due" else "daty wykonania" }}.</span>{% endif %}</span></label>
+    <div class="field" id="next-fields" {% if not (next_date or term.recurring) %}hidden{% endif %}>
+      <label for="next_date">Data kolejnego terminu</label>
+      <input type="date" name="next_date" id="next_date" value="{{ next_date }}">
+      <span class="hint">Możesz zmienić podpowiedź, np. gdy lekarz wyznaczył inny termin badań.</span>
+    </div>
+  </div>
+  <div class="field"><label for="files">Dołącz dokument (np. orzeczenie, faktura, protokół)</label>
+    <input type="file" name="files" id="files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ods,.odt,.odp,.ppt,.pptx,.txt,.rtf,.csv,image/*"></div>
+  <div class="form-actions"><a class="btn" href="/terminy/{{ term.id }}">Anuluj</a><span class="spacer"></span>
+    <button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz wykonanie</button></div>
+</form>
+{% endblock %}

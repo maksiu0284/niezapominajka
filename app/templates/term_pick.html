@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon with context %}
+{% block title %}Dodaj termin{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Dodaj termin</h1><p class="sub">Czego dotyczy nowy termin?</p></div></div>
+<div class="panel-tiles">
+  {% for m in allowed %}
+  <a class="tile m-{{ m }}" href="/terminy/nowy?modul={{ m }}">
+    <span class="micon" style="background:var(--ms);color:var(--m)">{{ icon(MODULES[m].icon) }}</span>
+    <span><h3>{{ MODULES[m].label }}</h3>
+      <p>{{ {"employees": "Badania, umowy, szkolenia, uprawnienia", "vehicles": "OC/AC, przeglądy, serwisy", "machines": "Serwisy, przeglądy, UDT", "company": "Płatności, podatki, ZUS, licencje"}[m] }}</p></span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

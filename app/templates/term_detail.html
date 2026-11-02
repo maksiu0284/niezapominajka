@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, status, file_list, confirm_delete with context %}
+{% block title %}{{ term.display_title }}{% endblock %}
+{% block content %}
+{% set P = perms[term.module] %}
+{% set M = MODULES[term.module] %}
+{% set here = "/terminy/%s"|format(term.id) %}
+{% set obj_url = ("/m/%s/%s"|format(term.module, term.object_id)) if M.has_objects else "/m/company" %}
+<div class="crumbs m-{{ term.module }}">
+  <span class="mtag"><span class="mdot" style="width:6px;height:6px;border-radius:50%"></span>{{ M.label }}</span>
+  {% if M.has_objects %}<span>/</span><a href="{{ obj_url }}">{{ term.object_name }}</a>{% endif %}
+</div>
+
+<div class="page-head s-{{ term.status_key }}">
+  <div>
+    <h1>{{ term.display_title }}</h1>
+    <p class="row mt-2">{{ status(term.status_key) }}<span class="small" style="color:var(--s);font-weight:650">{{ term.left_label }}</span></p>
+  </div>
+  <div class="page-actions">
+    {% if term.status == "open" and P.notify %}<button class="btn btn-sms" type="button" data-notify="{{ term.id }}">{{ icon("sms") }}Powiadom</button>{% endif %}
+    {% if term.status == "open" and P.edit %}<a class="btn btn-primary" href="{{ here }}/wykonane">{{ icon("check") }}Wykonane</a>{% endif %}
+    {% if term.status == "done" and P.edit %}
+    <form method="post" action="{{ here }}/przywroc" data-confirm="Cofnąć oznaczenie „wykonane”? Termin znów będzie otwarty." data-confirm-title="Cofnij wykonanie" data-confirm-ok="Cofnij">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("undo") }}Cofnij wykonanie</button></form>
+    {% endif %}
+    {% if P.edit %}<a class="btn" href="{{ here }}/edycja">{{ icon("edit") }}Edytuj</a>{% endif %}
+    {% if P.delete %}{{ confirm_delete(here ~ "/usun", "Usuń termin", "Usunąć termin „" ~ term.display_title ~ "” (" ~ (term.due_date|d) ~ ")? Tej operacji nie można cofnąć.") }}{% endif %}
+  </div>
+</div>
+
+<div class="layout-2">
+  <div class="stack">
+    <div class="card card-pad">
+      <dl class="facts">
+        <div class="fact"><dt>Termin</dt><dd><strong>{{ term.due_date|d }}</strong></dd></div>
+        <div class="fact"><dt>Dotyczy</dt><dd>{% if M.has_objects %}<a href="{{ obj_url }}">{{ term.object_name }}</a>{% else %}{{ term.object_name }}{% endif %}</dd></div>
+        <div class="fact"><dt>Osoba odpowiedzialna</dt><dd>{% if term.responsible %}{{ term.responsible_name }}{% if term.responsible.phone %}<br><a class="small" href="tel:{{ term.responsible.phone|replace(' ', '') }}">{{ term.responsible.phone }}</a>{% endif %}{% else %}—{% endif %}</dd></div>
+        <div class="fact"><dt>Cykl</dt><dd>{% if term.recurring %}{{ icon("repeat") }} co {{ term.interval_value }} {{ UNITS[term.interval_unit] }}{% else %}jednorazowy{% endif %}</dd></div>
+        <div class="fact"><dt>Przypomnienie</dt><dd>{{ term.remind_days if term.remind_days is not none else settings.remind_days }} dni przed{% if term.remind_days is none %} <span class="muted xs">(domyślnie)</span>{% endif %}</dd></div>
+        {% if term.counterparty %}<div class="fact"><dt>{{ "Kontrahent" if term.module == "company" else "Wykonawca" }}</dt><dd>{{ term.counterparty }}</dd></div>{% endif %}
+        {% if term.amount is not none %}<div class="fact"><dt>Kwota</dt><dd>{{ ("%.2f"|format(term.amount))|replace(".", ",") }} zł</dd></div>{% endif %}
+        {% if term.document_number %}<div class="fact"><dt>Nr dokumentu</dt><dd>{{ term.document_number }}</dd></div>{% endif %}
+      </dl>
+      {% if term.notes %}<hr class="divider"><p style="white-space:pre-line">{{ term.notes }}</p>{% endif %}
+      {% if term.status == "done" %}
+      <hr class="divider">
+      <p class="small">{{ icon("check") }} Wykonano <strong>{{ term.done_date|d }}</strong>{% if doer %} · oznaczył(a): {{ doer.full_name or doer.username }}{% endif %}</p>
+      {% if term.done_note %}<p class="small muted mt-2" style="white-space:pre-line">{{ term.done_note }}</p>{% endif %}
+      {% endif %}
+      <p class="xs muted mt-4">Dodano {{ term.created_at[:10]|d }}{% if creator %} przez {{ creator.full_name or creator.username }}{% endif %}{% if term.previous_id %} · <a href="/terminy/{{ term.previous_id }}">poprzedni termin w cyklu</a>{% endif %}</p>
+    </div>
+
+    {% if history %}
+    <div>
+      <div class="section-head"><h2>Historia tej sprawy</h2></div>
+      <div class="card table-wrap">
+        <table class="table resp">
+          <thead><tr><th>Termin</th><th>Status</th><th>Wykonano</th><th>Uwagi</th></tr></thead>
+          <tbody>{% for h in history %}
+            <tr><td data-l="Termin"><a href="/terminy/{{ h.id }}">{{ h.due_date|d }}</a>{% if h.title %} <span class="muted">– {{ h.title }}</span>{% endif %}</td>
+              <td data-l="Status">{{ status(h.status_key) }}</td>
+              <td data-l="Wykonano">{{ h.done_date|d if h.done_date else "—" }}</td><td data-l="Uwagi">{{ h.done_note or "" }}</td></tr>
+          {% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="card card-pad stack">
+    <h2>{{ icon("clip") }} Załączniki</h2>
+    {{ file_list(attachments, P.delete, here) }}
+    {% if P.edit %}
+    <form method="post" action="/zalaczniki" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="module" value="{{ term.module }}">
+      <input type="hidden" name="term_id" value="{{ term.id }}"><input type="hidden" name="back" value="{{ here }}">
+      <input type="file" name="files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ods,.odt,.odp,.ppt,.pptx,.txt,.rtf,.csv,image/*">
+      <button class="btn btn-sm" type="submit">{{ icon("upload") }}Dodaj pliki</button>
+    </form>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

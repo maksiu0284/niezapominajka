@@ -1,0 +1,159 @@
+{% from "macros.html" import icon, initials with context %}<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F3B70">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Niezapominajka">
+<title>{% block title %}{{ APP_NAME }}{% endblock %} · {{ settings.company_name or APP_NAME }}</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="stylesheet" href="/static/css/app.css?v={{ APP_VERSION }}">
+<script>try{var t=localStorage.getItem("nz-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-csrf="{{ csrf }}">
+{% set any_add = perms and (perms.values()|selectattr("add")|list|length > 0) %}
+{% set section = path.split("/")[1] if path else "" %}
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Menu główne">
+    <a class="brand" href="/">
+      <span class="brand-mark"><img src="/static/icons/icon-192.png" alt="" width="36" height="36"></span>
+      <span class="brand-text"><strong>{{ APP_NAME }}</strong><span>{{ settings.company_name }}</span></span>
+    </a>
+    <nav class="nav">
+      <a href="/" class="{{ 'active' if path == '/' }}">{{ icon("home") }}Pulpit</a>
+      {% if user and user.employee_id %}
+      <a href="/?moje=1&widok=all">{{ icon("user") }}Moje terminy</a>
+      {% endif %}
+      {% if any_add %}<a href="/terminy/nowy" class="{{ 'active' if path == '/terminy/nowy' }}">{{ icon("plus") }}Dodaj termin</a>{% endif %}
+      {% if perms %}
+      <div class="nav-label">Moduły</div>
+      {% for key, m in MODULES.items() if perms[key].view %}
+      <a href="/m/{{ key }}" class="m-{{ key }} {{ 'active' if path.startswith('/m/' ~ key) }}">{{ icon(m.icon) }}{{ m.label }}<span class="dot mdot"></span></a>
+      {% endfor %}
+      {% endif %}
+      {% if is_owner %}
+      <div class="nav-label">Właściciel</div>
+      <a href="/panel" class="{{ 'active' if path == '/panel' }}">{{ icon("shield") }}Panel właściciela</a>
+      <a href="/panel/uzytkownicy" class="{{ 'active' if path.startswith('/panel/uzytkownicy') }}">{{ icon("key") }}Użytkownicy</a>
+      <a href="/panel/dziennik" class="{{ 'active' if path.startswith('/panel/dziennik') }}">{{ icon("book") }}Dziennik zdarzeń</a>
+      {% endif %}
+      <div class="nav-label">Program</div>
+      <a href="/pomoc" class="{{ 'active' if path == '/pomoc' }}">{{ icon("help") }}Pomoc</a>
+      <a href="/o-programie" class="{{ 'active' if path == '/o-programie' }}">{{ icon("info") }}O programie</a>
+      <button type="button" data-theme-toggle>{{ icon("moon") }}<span data-theme-label>Tryb ciemny</span></button>
+    </nav>
+    {% if user %}
+    <div class="sidebar-foot">
+      <a class="who" href="/profil" style="color:inherit;text-decoration:none">
+        <span class="avatar">{{ initials(user.full_name or user.username) }}</span>
+        <span style="min-width:0"><strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ user.full_name or user.username }}</strong><small>{{ "Właściciel" if is_owner else "Użytkownik" }} · mój profil</small></span>
+      </a>
+      <form method="post" action="/wyloguj" class="nav">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit">{{ icon("logout") }}Wyloguj</button>
+      </form>
+    </div>
+    {% endif %}
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost btn-icon" type="button" data-drawer aria-label="Otwórz menu" aria-controls="sidebar">{{ icon("menu") }}</button>
+      <div class="title">{% block topbar %}{{ self.title() }}{% endblock %}</div>
+      {% if any_add %}<a class="btn btn-primary btn-sm btn-icon" href="/terminy/nowy" aria-label="Dodaj termin">{{ icon("plus") }}</a>{% endif %}
+    </header>
+
+    <main class="content" id="content">
+      {% if is_owner and update_available(settings) %}
+      <div class="notice no-print">{{ icon("download") }}<span class="grow">Dostępna jest nowa wersja {{ APP_NAME }} {{ settings.update_latest }} (masz {{ APP_VERSION }}).</span><a class="btn btn-sm" href="{{ settings.update_url or HOMEPAGE }}" target="_blank" rel="noopener">Pobierz</a></div>
+      {% endif %}
+      {% if flashes %}
+      <div class="flashes" role="status">
+        {% for kind, msg in flashes %}
+        <div class="flash flash-{{ kind }}">{{ icon({"ok": "check", "error": "alert", "warn": "alert"}.get(kind, "info")) }}<span>{{ msg }}</span></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+      <p class="footer-note no-print">{{ APP_NAME }} {{ APP_VERSION }} · <a href="/pomoc">Pomoc</a> · <a href="/o-programie">O programie</a></p>
+    </main>
+  </div>
+
+  {% if user %}
+  <nav class="bottombar" aria-label="Szybka nawigacja">
+    <a href="/" class="{{ 'active' if path == '/' }}">{{ icon("home") }}<span>Pulpit</span></a>
+    <a href="/?widok=all" class="">{{ icon("list") }}<span>Wszystkie</span></a>
+    {% if any_add %}<a href="/terminy/nowy" class="{{ 'active' if path == '/terminy/nowy' }}">{{ icon("plus") }}<span>Dodaj</span></a>
+    {% elif user.employee_id %}<a href="/?moje=1&widok=all">{{ icon("user") }}<span>Moje</span></a>
+    {% else %}<a href="/?widok=done">{{ icon("check") }}<span>Wykonane</span></a>{% endif %}
+    {% if is_owner %}<a href="/panel" class="{{ 'active' if section == 'panel' }}">{{ icon("shield") }}<span>Panel</span></a>
+    {% else %}<a href="/profil" class="{{ 'active' if path == '/profil' }}">{{ icon("user") }}<span>Profil</span></a>{% endif %}
+    <button type="button" data-drawer aria-controls="sidebar">{{ icon("menu") }}<span>Menu</span></button>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Okno: powiadomienie SMS / e-mail -->
+<dialog id="notify-dialog" aria-labelledby="notify-title">
+  <form method="dialog" id="notify-form">
+    <div class="dlg-head">
+      <h2 id="notify-title">Powiadom osobę</h2>
+      <button class="btn btn-ghost btn-icon" value="cancel" aria-label="Zamknij">{{ icon("x") }}</button>
+    </div>
+    <div class="dlg-body">
+      <div class="small"><strong data-n="title"></strong><br><span class="muted" data-n="object"></span> · <span data-n="due"></span> (<span data-n="left"></span>)</div>
+      <div class="tabs" role="tablist" style="margin-bottom:0">
+        <a href="#" class="active" data-channel="sms">{{ icon("sms") }} SMS</a>
+        <a href="#" data-channel="email">{{ icon("mail") }} E-mail</a>
+      </div>
+      <div class="field">
+        <span class="label">Odbiorca</span>
+        <div class="contact-list" id="notify-contacts"></div>
+        <p class="hint muted xs" id="notify-nocontacts" hidden>Brak osób z telefonem lub e-mailem. Uzupełnij dane w karcie pracownika.</p>
+      </div>
+      <div class="field" data-for="email" hidden>
+        <label for="notify-subject">Temat</label>
+        <input type="text" id="notify-subject">
+      </div>
+      <div class="field">
+        <label for="notify-text">Treść wiadomości</label>
+        <textarea id="notify-text" rows="5"></textarea>
+        <span class="hint">Po naciśnięciu przycisku otworzy się aplikacja SMS lub poczty z gotową treścią. Wysyłkę zatwierdzasz w telefonie. Jeśli treść się nie wstawi, użyj „Kopiuj” i wklej ją.</span>
+      </div>
+      <p class="errors" id="notify-error" hidden></p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" value="cancel">Anuluj</button>
+      <button class="btn" type="button" id="notify-copy">{{ icon("copy") }}<span>Kopiuj</span></button>
+      <button class="btn btn-primary" type="button" id="notify-send">{{ icon("sms") }}<span>Otwórz SMS</span></button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Okno: potwierdzenie -->
+<dialog id="confirm-dialog" aria-labelledby="confirm-title">
+  <form method="dialog">
+    <div class="dlg-head"><h2 id="confirm-title">Potwierdź</h2></div>
+    <div class="dlg-body"><p id="confirm-text"></p></div>
+    <div class="dlg-foot">
+      <button class="btn" value="cancel">Anuluj</button>
+      <button class="btn btn-danger-solid" value="ok" id="confirm-ok">{{ icon("trash") }}<span>Usuń</span></button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Okno: podgląd zdjęcia -->
+<dialog id="photo-dialog" class="photo-dialog">
+  <form method="dialog"><button style="all:unset;cursor:zoom-out;display:block" aria-label="Zamknij"><img id="photo-dialog-img" alt=""></button></form>
+</dialog>
+
+<script src="/static/js/app.js?v={{ APP_VERSION }}" defer></script>
+</body>
+</html>

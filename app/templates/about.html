@@ -1,0 +1,46 @@
+{% extends ("base.html" if user else "auth_base.html") %}
+{% from "macros.html" import icon with context %}
+{% block title %}O programie{% endblock %}
+{% block card_class %}auth-wide{% endblock %}
+{% block content %}
+<div class="about-hero card card-pad">
+  <img src="/static/icons/icon-192.png" alt="" width="96" height="96">
+  <div>
+    <h1>{{ APP_NAME }}</h1>
+    <p class="sub">{{ APP_TAGLINE }}</p>
+    <p class="small mt-2">Wersja <strong>{{ APP_VERSION }}</strong>{% if update_available(settings) %} · <a href="{{ settings.update_url or HOMEPAGE }}" target="_blank" rel="noopener">dostępna nowa wersja {{ settings.update_latest }}</a>{% endif %}</p>
+  </div>
+</div>
+<div class="grid grid-2 mt-4" style="align-items:start">
+  <div class="card card-pad stack">
+    <h2>Twórca</h2>
+    <p><strong>{{ AUTHOR }}</strong><br><a href="mailto:{{ AUTHOR_EMAIL }}">{{ AUTHOR_EMAIL }}</a></p>
+    <p class="small">Strona projektu: <a href="{{ HOMEPAGE }}" target="_blank" rel="noopener">{{ HOMEPAGE.replace("https://", "") }}</a><br>
+      Zgłoszenia błędów i propozycje: <a href="{{ HOMEPAGE }}/issues" target="_blank" rel="noopener">GitHub Issues</a></p>
+    <div class="sponsor">
+      <p class="small">Program jest bezpłatny. Jeśli Ci pomaga, możesz dobrowolnie wesprzeć jego rozwój.</p>
+      <a class="btn btn-sponsor" href="{{ SPONSOR_URL }}" target="_blank" rel="noopener">{{ icon("heart") }}Wesprzyj projekt</a>
+    </div>
+  </div>
+  <div class="card card-pad stack">
+    <h2>Licencja</h2>
+    <p class="small">{{ APP_NAME }} jest oprogramowaniem wolnym i otwartoźródłowym na licencji <strong>{{ license_name }}</strong>. Możesz go używać, kopiować, zmieniać i rozpowszechniać na warunkach tej licencji. Jeśli udostępniasz zmienioną wersję innym przez sieć, musisz udostępnić im też jej kod źródłowy.</p>
+    <p class="small">Program jest dostarczany bez jakiejkolwiek gwarancji. Copyright © 2026 {{ AUTHOR }}.</p>
+    <div class="row"><a class="btn btn-sm" href="/licencja" target="_blank">{{ icon("file") }}Pełny tekst licencji</a>
+      <a class="btn btn-sm" href="{{ HOMEPAGE }}" target="_blank" rel="noopener">{{ icon("download") }}Kod źródłowy</a></div>
+  </div>
+</div>
+<div class="card card-pad stack mt-4">
+  <h2>Użyte komponenty</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Komponent</th><th>Licencja</th></tr></thead>
+    <tbody>{% for name, lic, url in third_party %}<tr><td><a href="{{ url }}" target="_blank" rel="noopener">{{ name }}</a></td><td>{{ lic }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+{% if data_dir %}
+<div class="card card-pad stack mt-4">
+  <h2>Ten serwer</h2>
+  <p class="small">Adres w sieci firmowej: <code>{{ lan }}</code><br>Folder danych: <code>{{ data_dir }}</code></p>
+</div>
+{% endif %}
+{% endblock %}

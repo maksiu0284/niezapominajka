@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs, errors_box with context %}
+{% block title %}Powiadomienia automatyczne{% endblock %}
+{% macro secret(name, label, hint="") %}
+<div class="field"><label for="{{ name }}">{{ label }}</label>
+  <input type="password" name="{{ name }}" id="{{ name }}" autocomplete="new-password" placeholder="{{ 'zapisane – zostaw puste, aby nie zmieniać' if secrets_set[name] else '' }}">
+  {% if secrets_set[name] %}<label class="check xs"><input type="checkbox" name="{{ name }}_clear" value="1"> usuń zapisane</label>{% endif %}
+  {% if hint %}<span class="hint">{{ hint }}</span>{% endif %}</div>
+{% endmacro %}
+{% block content %}
+<div class="page-head"><div><h1>Powiadomienia automatyczne</h1><p class="sub">Program sam wysyła przypomnienia raz dziennie. Ręczne SMS i e-mail działają niezależnie.</p></div></div>
+{{ panel_tabs("notify") }}
+<div class="grid grid-3" style="margin-bottom:var(--space-5)">
+  <div class="card card-pad"><p class="muted small">Wysyłka automatyczna</p><p><span class="pill {{ 'pill-owner' if s.notify_enabled == '1' else 'pill-off' }}">{{ "włączona" if s.notify_enabled == "1" else "wyłączona" }}</span>{% if s.notify_last_run %} <span class="xs muted">ostatnio {{ s.notify_last_run[:10]|d }}</span>{% endif %}</p></div>
+  <div class="card card-pad"><p class="muted small">E-mail</p><p><span class="pill {{ 'pill-owner' if email_ok else '' }}">{{ "skonfigurowany" if email_ok else "nie skonfigurowany" }}</span></p></div>
+  <div class="card card-pad"><p class="muted small">SMS</p><p><span class="pill {{ 'pill-owner' if sms_ok else '' }}">{{ providers[s.sms_provider] if sms_ok else "nie skonfigurowany" }}</span></p></div>
+</div>
+<form method="post" action="/panel/powiadomienia" class="form" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {{ errors_box(errors) }}
+  <div class="card card-pad form">
+    <h2>{{ icon("bell") }} Kiedy i komu</h2>
+    <label class="check"><input type="checkbox" name="notify_enabled" value="1" {{ 'checked' if s.notify_enabled == '1' }}> Włącz automatyczną wysyłkę przypomnień</label>
+    <div class="form-grid">
+      <div class="field"><label for="notify_hour">Godzina wysyłki</label><input type="number" name="notify_hour" id="notify_hour" min="0" max="23" value="{{ s.notify_hour }}">
+        <span class="hint">Serwer musi być wtedy włączony. Jeśli był wyłączony, wysyłka nastąpi po uruchomieniu tego samego dnia.</span></div>
+      <div class="field"><label for="notify_repeat_days">Po terminie przypominaj co (dni)</label><input type="number" name="notify_repeat_days" id="notify_repeat_days" min="0" max="90" value="{{ s.notify_repeat_days }}"><span class="hint">0 – tylko raz.</span></div>
+    </div>
+    <fieldset><div class="fieldset-title">Osoba odpowiedzialna dostaje wiadomość, gdy termin jest</div>
+      <label class="check"><input type="checkbox" name="notify_stage_soon" value="1" {{ 'checked' if s.notify_stage_soon == '1' }}> wkrótce ({{ settings.remind_days }} dni przed)</label>
+      <label class="check"><input type="checkbox" name="notify_stage_urgent" value="1" {{ 'checked' if s.notify_stage_urgent == '1' }}> pilny ({{ settings.urgent_days }} dni przed)</label>
+      <label class="check"><input type="checkbox" name="notify_stage_overdue" value="1" {{ 'checked' if s.notify_stage_overdue == '1' }}> po terminie</label>
+    </fieldset>
+    <label class="check"><input type="checkbox" name="notify_digest_empty" value="1" {{ 'checked' if s.notify_digest_empty == '1' }}> Wysyłaj codzienne zestawienie także wtedy, gdy nie ma pilnych spraw</label>
+    <p class="xs muted">Kanał dla pracownika ustawiasz w jego karcie (pole „Powiadomienia automatyczne”). Użytkownicy zamawiają zestawienie w swoim profilu, a właściciel może to zmienić w karcie konta.</p>
+  </div>
+
+  <div class="card card-pad form" id="email">
+    <h2>{{ icon("mail") }} E-mail (SMTP)</h2>
+    <p class="small muted">Firmowa skrzynka: dane serwera poczty od dostawcy. Gmail: serwer <code>smtp.gmail.com</code>, port 587, STARTTLS, login = adres Gmail, hasło = <strong>hasło aplikacji</strong> (wymaga weryfikacji dwuetapowej konta Google).</p>
+    <div class="form-grid">
+      <div class="field"><label for="smtp_host">Serwer SMTP</label><input type="text" name="smtp_host" id="smtp_host" value="{{ s.smtp_host }}" placeholder="np. smtp.gmail.com" autocapitalize="none"></div>
+      <div class="field"><label for="smtp_port">Port</label><input type="number" name="smtp_port" id="smtp_port" value="{{ s.smtp_port }}"></div>
+      <div class="field"><label for="smtp_security">Szyfrowanie</label><select name="smtp_security" id="smtp_security">
+        {% for k, v in [("starttls", "STARTTLS (port 587)"), ("ssl", "SSL/TLS (port 465)"), ("none", "brak (tylko sieć lokalna)")] %}<option value="{{ k }}" {{ 'selected' if s.smtp_security == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="smtp_user">Login</label><input type="text" name="smtp_user" id="smtp_user" value="{{ s.smtp_user }}" autocapitalize="none" autocomplete="off"></div>
+      {{ secret("smtp_password", "Hasło / hasło aplikacji") }}
+      <div class="field"><label for="smtp_from">Adres nadawcy</label><input type="email" name="smtp_from" id="smtp_from" value="{{ s.smtp_from }}" placeholder="pusty = login"></div>
+      <div class="field"><label for="smtp_from_name">Nazwa nadawcy</label><input type="text" name="smtp_from_name" id="smtp_from_name" value="{{ s.smtp_from_name }}" placeholder="np. {{ settings.company_name }} – przypomnienia"></div>
+    </div>
+  </div>
+
+  <div class="card card-pad form" id="sms">
+    <h2>{{ icon("sms") }} SMS</h2>
+    <div class="field"><label for="sms_provider">Bramka SMS</label><select name="sms_provider" id="sms_provider" data-show-group>
+      {% for k, v in providers.items() %}<option value="{{ k }}" {{ 'selected' if s.sms_provider == k }}>{{ v }}</option>{% endfor %}</select></div>
+    <div class="form-grid" data-group="smsapi" {% if s.sms_provider != 'smsapi' %}hidden{% endif %}>
+      <p class="small muted full">SMSAPI.pl – płatna bramka. W panelu SMSAPI utwórz token OAuth z dostępem do wysyłki SMS. Nazwa nadawcy musi być zatwierdzona w SMSAPI.</p>
+      {{ secret("smsapi_token", "Token API") }}
+      <div class="field"><label for="smsapi_from">Nazwa nadawcy</label><input type="text" name="smsapi_from" id="smsapi_from" value="{{ s.smsapi_from }}" maxlength="11" placeholder="pusta = domyślna"></div>
+      <label class="check full"><input type="checkbox" name="smsapi_test" value="1" {{ 'checked' if s.smsapi_test == '1' }}> Tryb testowy – SMSAPI przyjmuje wiadomości, ale ich nie wysyła i nie pobiera opłat</label>
+    </div>
+    <div class="form-grid" data-group="android" {% if s.sms_provider != 'android' %}hidden{% endif %}>
+      <p class="small muted full">Aplikacja „SMS Gateway for Android” w telefonie z kartą SIM. SMS-y kosztują według taryfy tej karty.</p>
+      <div class="field"><label for="android_mode">Tryb</label><select name="android_mode" id="android_mode">
+        <option value="local" {{ 'selected' if s.android_mode == 'local' }}>lokalny – telefon w sieci firmowej</option>
+        <option value="cloud" {{ 'selected' if s.android_mode == 'cloud' }}>chmurowy – przez serwer api.sms-gate.app</option></select></div>
+      <div class="field"><label for="android_url">Adres telefonu (tryb lokalny)</label><input type="url" name="android_url" id="android_url" value="{{ s.android_url }}" placeholder="http://192.168.1.50:8080"></div>
+      <div class="field"><label for="android_user">Login</label><input type="text" name="android_user" id="android_user" value="{{ s.android_user }}" autocapitalize="none" autocomplete="off"></div>
+      {{ secret("android_password", "Hasło") }}
+    </div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz ustawienia</button></div>
+</form>
+
+<div class="grid grid-2 mt-6" style="align-items:start">
+  <div class="card card-pad stack">
+    <h2>Test wysyłki</h2>
+    <p class="small muted">Najpierw zapisz ustawienia.</p>
+    <form method="post" action="/panel/powiadomienia/test" class="row">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="channel" value="email">
+      <input type="email" name="address" value="{{ user.email or '' }}" placeholder="adres e-mail" required class="grow" aria-label="Adres e-mail do testu">
+      <button class="btn" type="submit" {% if not email_ok %}disabled{% endif %}>{{ icon("mail") }}Wyślij test</button>
+    </form>
+    <form method="post" action="/panel/powiadomienia/test" class="row">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="channel" value="sms">
+      <input type="tel" name="address" value="{{ user.phone or '' }}" placeholder="numer telefonu" required class="grow" aria-label="Numer telefonu do testu">
+      <button class="btn" type="submit" {% if not sms_ok %}disabled{% endif %}>{{ icon("sms") }}Wyślij SMS</button>
+    </form>
+    {% if s.sms_provider == "smsapi" and secrets_set.smsapi_token %}
+    <form method="post" action="/panel/powiadomienia/test"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="channel" value="smsapi_profile">
+      <button class="btn btn-sm btn-ghost" type="submit">{{ icon("key") }}Sprawdź token i stan konta SMSAPI</button></form>
+    {% endif %}
+  </div>
+  <div class="card card-pad stack">
+    <h2>Wyślij teraz</h2>
+    <p class="small muted">Wysyła dzisiejsze przypomnienia od razu, bez czekania na ustaloną godzinę. Nikt nie dostanie tej samej wiadomości dwa razy.</p>
+    <form method="post" action="/panel/powiadomienia/uruchom" data-confirm="Wysłać teraz zaległe przypomnienia do osób odpowiedzialnych?" data-confirm-title="Wyślij teraz" data-confirm-ok="Wyślij">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primary" type="submit" {% if not (email_ok or sms_ok) %}disabled{% endif %}>{{ icon("bell") }}Wyślij przypomnienia teraz</button></form>
+    <p class="xs muted">Odbiorcy: pracownicy {{ recipients.employees|length }}, użytkownicy (zestawienie) {{ recipients.users|length }}.</p>
+  </div>
+</div>
+
+<div class="card mt-6" id="dziennik">
+  <div class="card-pad"><h2>Dziennik wysyłki</h2><p class="small muted">Ostatnie 100 wiadomości.</p></div>
+  <div class="table-wrap"><table class="table resp">
+    <thead><tr><th>Kiedy</th><th>Kanał</th><th>Odbiorca</th><th>Treść</th><th>Wynik</th></tr></thead>
+    <tbody>
+    {% for r in log %}
+    <tr>
+      <td class="small" style="white-space:nowrap">{{ r.ts[:10]|d }} {{ r.ts[11:16] }}</td>
+      <td data-l="Kanał">{{ {"email": "e-mail", "sms": "SMS"}.get(r.channel, r.channel) }}<br><span class="xs muted">{{ {"test": "test", "zestawienie": "zestawienie", "termin": "przypomnienie"}.get(r.kind, r.kind) }}</span></td>
+      <td data-l="Odbiorca">{{ r.recipient }}{% if r.address and r.address != r.recipient %}<br><span class="xs muted">{{ r.address }}</span>{% endif %}</td>
+      <td data-l="Treść" class="small">{{ r.subject }}</td>
+      <td data-l="Wynik">{% if r.ok %}<span class="pill pill-owner">wysłano</span>{% else %}<span class="pill pill-off">błąd</span><br><span class="xs">{{ r.error }}</span>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">Jeszcze nic nie wysłano.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

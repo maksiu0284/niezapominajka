@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs with context %}
+{% block title %}Panel właściciela{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Panel właściciela</h1><p class="sub">{{ settings.company_name }}</p></div></div>
+{{ panel_tabs("index") }}
+<div class="grid grid-3" style="margin-bottom:var(--space-6)">
+  <div class="card card-pad"><p class="muted small">Konta użytkowników</p><p style="font-size:var(--text-xl);font-weight:700">{{ stats.users }}</p></div>
+  <div class="card card-pad"><p class="muted small">Pracownicy / pojazdy / maszyny</p><p style="font-size:var(--text-xl);font-weight:700">{{ stats.employees }} / {{ stats.vehicles }} / {{ stats.machines }}</p></div>
+  <div class="card card-pad"><p class="muted small">Otwarte terminy</p><p style="font-size:var(--text-xl);font-weight:700">{{ stats.terms }}</p></div>
+</div>
+{% if not last_backup %}
+<div class="notice">{{ icon("alert") }}<span class="grow">Nie ma jeszcze żadnej kopii zapasowej.</span><a class="btn btn-sm" href="/panel/kopie">Utwórz kopię</a></div>
+{% endif %}
+<div class="panel-tiles">
+  <a class="tile" href="/panel/uzytkownicy"><span class="micon">{{ icon("key") }}</span><span><h3>Użytkownicy i uprawnienia</h3><p>Konta, role, prawa: podgląd, dodawanie, edycja, usuwanie, powiadamianie.</p></span></a>
+  <a class="tile" href="/panel/rodzaje"><span class="micon">{{ icon("tag") }}</span><span><h3>Rodzaje spraw</h3><p>Lista spraw w modułach i domyślne cykle powtarzania.</p></span></a>
+  <a class="tile" href="/panel/pola"><span class="micon">{{ icon("list") }}</span><span><h3>Własne pola</h3><p>Dodatkowe pola w kartach pracowników, pojazdów i maszyn.</p></span></a>
+  <a class="tile" href="/panel/ustawienia"><span class="micon">{{ icon("sliders") }}</span><span><h3>Ustawienia i szablony</h3><p>Nazwa firmy, okres przypomnień, treść SMS i e-mail.</p></span></a>
+  <a class="tile" href="/panel/powiadomienia"><span class="micon">{{ icon("bell") }}</span><span><h3>Powiadomienia automatyczne</h3><p>{{ "Włączone" if settings.notify_enabled == "1" else "Wyłączone" }} · e-mail (SMTP, Gmail), SMS (SMSAPI, telefon z Androidem).</p></span></a>
+  <a class="tile" href="/panel/dostep-zdalny"><span class="micon">{{ icon("globe") }}</span><span><h3>Dostęp zdalny</h3><p>{{ REMOTE_MODES[settings.remote_mode or "off"] }}.</p></span></a>
+  <a class="tile" href="/panel/import"><span class="micon">{{ icon("upload") }}</span><span><h3>Import z Excela</h3><p>Pracownicy, pojazdy, maszyny i terminy z arkusza wg wzoru.</p></span></a>
+  <a class="tile" href="/panel/kopie"><span class="micon">{{ icon("archive") }}</span><span><h3>Kopie zapasowe</h3><p>{% if last_backup %}Ostatnia: {{ last_backup.time }} ({{ last_backup.size|size }}){% else %}Brak kopii{% endif %}</p></span></a>
+  <a class="tile" href="/panel/dziennik"><span class="micon">{{ icon("book") }}</span><span><h3>Dziennik zdarzeń</h3><p>Kto, kiedy i co zmienił. Wpisów: {{ stats.log }}.</p></span></a>
+</div>
+<div class="card card-pad mt-6">
+  <h2>{{ icon("phone") }} Dostęp z telefonu</h2>
+  <p class="small mt-2">W sieci firmowej otwórz na telefonie adres <code>{{ lan_url() }}</code> i wybierz „Dodaj do ekranu głównego”. Spoza firmy – skonfiguruj <a href="/panel/dostep-zdalny">dostęp zdalny</a>{% if settings.twofa_enabled != "1" %} i włącz <a href="/panel/ustawienia#bezpieczenstwo">logowanie dwuetapowe</a>{% endif %}.</p>
+</div>
+{% endblock %}

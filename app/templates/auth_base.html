@@ -1,0 +1,31 @@
+{% from "macros.html" import icon with context %}<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F3B70">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Niezapominajka">
+<title>{% block title %}{{ APP_NAME }}{% endblock %} · {{ APP_NAME }}</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/icons/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="stylesheet" href="/static/css/app.css?v={{ APP_VERSION }}">
+<script>try{var t=localStorage.getItem("nz-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-csrf="{{ csrf }}">
+<main class="auth">
+  <div class="auth-card {% block card_class %}{% endblock %}">
+    <div class="auth-brand">
+      <span class="brand-mark" style="width:48px;height:48px"><img src="/static/icons/icon-192.png" alt="" width="48" height="48"></span>
+      <div><strong>{{ APP_NAME }}</strong><small>{{ (settings.company_name if settings) or APP_TAGLINE }}</small></div>
+    </div>
+    {% if flashes %}<div class="flashes">{% for kind, msg in flashes %}<div class="flash flash-{{ kind }}">{{ msg }}</div>{% endfor %}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </div>
+  <p class="auth-foot">{{ APP_NAME }} {{ APP_VERSION }} · <a href="/pomoc">Pomoc</a> · <a href="/o-programie">O programie</a> · <a href="/">Logowanie</a></p>
+</main>
+<script src="/static/js/app.js?v={{ APP_VERSION }}" defer></script>
+</body>
+</html>

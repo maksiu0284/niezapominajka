@@ -1,0 +1,24 @@
+{% extends "auth_base.html" %}
+{% from "macros.html" import icon with context %}
+{% block title %}Logowanie{% endblock %}
+{% block content %}
+<form method="post" action="/logowanie" class="form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="next" value="{{ next or '/' }}">
+  <h1>Zaloguj się</h1>
+  {% if error %}<div class="errors" role="alert">{{ error }}</div>{% endif %}
+  <div class="field">
+    <label for="username">Login</label>
+    <input type="text" name="username" id="username" value="{{ username or '' }}" autocomplete="username" autocapitalize="none" required autofocus>
+  </div>
+  <div class="field">
+    <label for="password">Hasło</label>
+    <div class="pw-wrap">
+      <input type="password" name="password" id="password" autocomplete="current-password" required>
+      <button type="button" class="btn btn-ghost btn-sm btn-icon pw-toggle" data-toggle-pw="password" aria-label="Pokaż hasło">{{ icon("eye") }}</button>
+    </div>
+  </div>
+  <button class="btn btn-primary" type="submit">{{ icon("lock") }}Zaloguj</button>
+  <p class="small muted">Nie pamiętasz hasła? Użytkownik prosi właściciela o hasło tymczasowe. Właściciel może <a href="/odzyskiwanie">użyć kodu odzyskiwania</a>.</p>
+</form>
+{% endblock %}

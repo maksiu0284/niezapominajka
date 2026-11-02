@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, status, initials with context %}
+{% block title %}{{ meta.label }}{% endblock %}
+{% block content %}
+<div class="page-head m-{{ module }}">
+  <div class="row">
+    <span class="micon">{{ icon(meta.icon) }}</span>
+    <div><h1>{{ meta.label }}</h1><p class="sub">Rekordów: {{ rows|length }}</p></div>
+  </div>
+  <div class="page-actions">
+    <a class="btn" href="/eksport/m/{{ module }}.xlsx">{{ icon("download") }}Excel</a>
+    <a class="btn" href="/eksport/m/{{ module }}.csv">{{ icon("download") }}CSV</a>
+    {% if perms[module].add %}<a class="btn btn-primary" href="/m/{{ module }}/nowy">{{ icon("plus") }}{{ meta.new }}</a>{% endif %}
+  </div>
+</div>
+
+<form class="toolbar" method="get" role="search">
+  <input type="hidden" name="widok" value="{{ view }}">
+  <label class="search"><span class="sr-only">Szukaj</span>{{ icon("search") }}<input type="search" name="q" value="{{ q }}" placeholder="Szukaj w: {{ meta.label|lower }}"></label>
+  <button class="btn" type="submit">Szukaj</button>
+  {% if q %}<a class="btn btn-ghost" href="/m/{{ module }}?widok={{ view }}">{{ icon("x") }}Wyczyść</a>{% endif %}
+</form>
+<div class="chips" style="margin-bottom:var(--space-5)">
+  <a class="chip {{ 'active' if view != 'alert' }}" href="/m/{{ module }}{% if q %}?q={{ q|urlencode }}{% endif %}">Wszystkie</a>
+  <a class="chip {{ 'active' if view == 'alert' }}" href="/m/{{ module }}?widok=alert{% if q %}&q={{ q|urlencode }}{% endif %}">Wymagające uwagi</a>
+</div>
+
+{% if rows %}
+<div class="objects m-{{ module }}">
+  {% for o in rows %}
+  <a class="obj" href="/m/{{ module }}/{{ o.id }}">
+    <span class="ph">{% if o.photo_path %}<img src="/zdjecie/{{ module }}/{{ o.id }}" alt="" loading="lazy">{% elif module == "employees" %}{{ initials(o.display) }}{% else %}{{ icon(meta.icon) }}{% endif %}</span>
+    <span class="info">
+      <span class="name">{{ o.display }}</span>
+      {% set parts = [] %}{% for fname in meta.list_fields %}{% if o[fname] %}{% set _ = parts.append(o[fname]|string) %}{% endif %}{% endfor %}{% if o.responsible %}{% set _ = parts.append(o.responsible.first_name ~ " " ~ o.responsible.last_name) %}{% endif %}
+      <span class="meta">{{ parts|join(" · ") }}&nbsp;</span>
+      <span class="next">
+        {% if o.next_term %}
+          {{ status(o.worst) }}<span class="small">{{ o.next_term.category }} · {{ o.next_term.due_date|d }}</span>
+        {% else %}<span class="muted small">Brak otwartych terminów</span>{% endif %}
+        {% if o.open_count > 1 %}<span class="pill">+{{ o.open_count - 1 }}</span>{% endif %}
+      </span>
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty">{{ icon(meta.icon) }}<h3>{% if q or view == 'alert' %}Brak wyników{% else %}Brak rekordów{% endif %}</h3>
+  <p>{% if q or view == 'alert' %}Zmień filtr lub frazę.{% else %}Dodaj pierwszy rekord, a następnie jego terminy.{% endif %}</p>
+  {% if perms[module].add and not q %}<a class="btn btn-primary" href="/m/{{ module }}/nowy">{{ icon("plus") }}{{ meta.new }}</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

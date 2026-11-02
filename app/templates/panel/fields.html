@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs with context %}
+{% block title %}Własne pola{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Własne pola</h1><p class="sub">Dodatkowe informacje w kartach, np. numer karty kierowcy, rozmiar odzieży, numer polisy.</p></div></div>
+{{ panel_tabs("fields") }}
+<form method="post" action="/panel/pola" class="card card-pad form" style="margin-bottom:var(--space-6)">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="add">
+  <h2>Dodaj pole</h2>
+  <div class="form-grid">
+    <div class="field"><label for="f_module">Moduł</label>
+      <select name="module" id="f_module">{% for k, m in MODULES.items() if m.has_objects %}<option value="{{ k }}">{{ m.label }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="f_name">Nazwa pola</label><input type="text" name="name" id="f_name" required></div>
+    <div class="field"><label for="f_type">Typ</label>
+      <select name="field_type" id="f_type"><option value="text">Tekst</option><option value="number">Liczba</option><option value="date">Data</option></select></div>
+    <div class="field" style="justify-content:flex-end"><label class="check"><input type="checkbox" name="required" value="1"> Pole wymagane</label></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("plus") }}Dodaj pole</button></div>
+</form>
+{% set types = {"text": "Tekst", "number": "Liczba", "date": "Data"} %}
+<div class="card table-wrap">
+  <table class="table resp">
+    <thead><tr><th>Moduł</th><th>Pole</th><th>Typ</th><th>Wymagane</th><th></th></tr></thead>
+    <tbody>
+    {% for f in fields %}
+    <tr class="m-{{ f.module }}">
+      <td><span class="mtag">{{ MODULES[f.module].label }}</span></td>
+      <td><strong>{{ f.name }}</strong></td>
+      <td data-l="Typ">{{ types.get(f.field_type, f.field_type) }}</td>
+      <td data-l="Wymagane">
+        <form method="post" action="/panel/pola"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="{{ f.id }}">
+          <button class="btn btn-sm" type="submit">{{ "Tak – zmień na nie" if f.required else "Nie – zmień na tak" }}</button></form></td>
+      <td><form method="post" action="/panel/pola" data-confirm="Usunąć pole „{{ f.name }}” razem z zapisanymi wartościami we wszystkich kartach?" data-confirm-title="Usuń pole">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ f.id }}">
+          <button class="btn btn-sm btn-ghost btn-icon" type="submit" aria-label="Usuń pole {{ f.name }}">{{ icon("trash") }}</button></form></td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">Nie dodano jeszcze własnych pól.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

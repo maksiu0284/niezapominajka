@@ -1,0 +1,16 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(filevers=(1, 0, 1, 0), prodvers=(1, 0, 1, 0), mask=0x3f, flags=0x0,
+                    OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('041504B0', [
+      StringStruct('CompanyName', 'Maksymilian Staszewski'),
+      StringStruct('FileDescription', 'Niezapominajka – przypominajka ważnych terminów w firmie'),
+      StringStruct('FileVersion', '1.0.1'),
+      StringStruct('InternalName', 'Niezapominajka'),
+      StringStruct('LegalCopyright', 'Copyright (C) 2026 Maksymilian Staszewski, AGPL-3.0'),
+      StringStruct('OriginalFilename', 'Niezapominajka.exe'),
+      StringStruct('ProductName', 'Niezapominajka'),
+      StringStruct('ProductVersion', '1.0.1')])]),
+    VarFileInfo([VarStruct('Translation', [0x0415, 1200])])
+  ]
+)

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Niezapominajka
+GenericName=Przypominajka terminów
+Comment=Przypominajka ważnych terminów w firmie
+Exec=niezapominajka
+Icon=niezapominajka
+Terminal=false
+Categories=Office;ProjectManagement;
+Keywords=terminy;przypomnienia;badania;przeglądy;
+X-AppImage-Version=1.0.1

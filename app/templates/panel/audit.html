@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs with context %}
+{% block title %}Dziennik zdarzeń{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Dziennik zdarzeń</h1><p class="sub">Wpisów: {{ total }}. Dziennika nie można edytować ani usuwać z poziomu programu.</p></div>
+  <div class="page-actions"><a class="btn" href="/panel/dziennik.xlsx{% if qs %}?{{ qs }}{% endif %}">{{ icon("download") }}Excel</a><a class="btn" href="/panel/dziennik.csv{% if qs %}?{{ qs }}{% endif %}">{{ icon("download") }}CSV</a></div></div>
+{{ panel_tabs("audit") }}
+<form method="get" class="card card-pad" style="margin-bottom:var(--space-5)">
+  <div class="grid grid-3">
+    <div class="field"><label for="od">Od</label><input type="date" name="od" id="od" value="{{ f.od }}"></div>
+    <div class="field"><label for="do">Do</label><input type="date" name="do" id="do" value="{{ f.do }}"></div>
+    <div class="field"><label for="uzytkownik">Użytkownik</label><select name="uzytkownik" id="uzytkownik"><option value="">wszyscy</option>{% for u in users %}<option {{ 'selected' if f.uzytkownik == u }}>{{ u }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="akcja">Operacja</label><select name="akcja" id="akcja"><option value="">wszystkie</option>{% for k, v in actions.items() %}<option value="{{ k }}" {{ 'selected' if f.akcja == k }}>{{ v }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="modul">Moduł</label><select name="modul" id="modul"><option value="">wszystkie</option>{% for k, m in MODULES.items() %}<option value="{{ k }}" {{ 'selected' if f.modul == k }}>{{ m.label }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="q">Szukaj w opisie</label><input type="search" name="q" id="q" value="{{ f.q }}"></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("search") }}Filtruj</button>{% if qs %}<a class="btn btn-ghost" href="/panel/dziennik">{{ icon("x") }}Wyczyść</a>{% endif %}</div>
+</form>
+
+<div class="card table-wrap">
+  <table class="table resp">
+    <thead><tr><th>Kiedy</th><th>Kto</th><th>Operacja</th><th>Opis</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="small" style="white-space:nowrap">{{ r.ts[:10]|d }} {{ r.ts[11:16] }}</td>
+      <td data-l="Kto"><strong>{{ r.username or "—" }}</strong>{% if r.ip %}<br><span class="xs muted">{{ r.ip }}</span>{% endif %}</td>
+      <td data-l="Operacja"><span class="pill {{ 'pill-off' if r.action in ('delete', 'login_failed') else ('pill-owner' if r.action in ('create', 'done') else '') }}">{{ actions.get(r.action, r.action) }}</span>
+        {% if r.module %}<br><span class="xs m-{{ r.module }}" style="color:var(--m)">{{ MODULES[r.module].label if r.module in MODULES else r.module }}</span>{% endif %}</td>
+      <td data-l="Opis">{{ r.description }}
+        {% if r.changes %}
+        <div class="diff">{% for k, b, a in r.changes[:12] %}<div><span class="k">{{ k }}:</span> <del>{{ b if b not in (none, "") else "puste" }}</del> → <ins>{{ a if a not in (none, "") else "puste" }}</ins></div>{% endfor %}
+          {% if r.changes|length > 12 %}<div class="muted">… i {{ r.changes|length - 12 }} więcej</div>{% endif %}</div>
+        {% endif %}
+        {% if r.snapshot %}
+        <details class="mt-2"><summary>Szczegóły</summary>
+          <div class="diff">{% for k, v in r.snapshot.items() if v not in (none, "") and k not in ("password_hash", "recovery_hash") %}<div><span class="k">{{ k }}:</span> {{ v }}</div>{% endfor %}</div>
+        </details>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="4" class="muted">Brak wpisów dla wybranych filtrów.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a class="btn btn-sm" href="?strona={{ page - 1 }}{% if qs %}&{{ qs }}{% endif %}">{{ icon("back") }}Nowsze</a>{% endif %}
+  <span class="small muted">Strona {{ page }} z {{ pages }}</span>
+  {% if page < pages %}<a class="btn btn-sm" href="?strona={{ page + 1 }}{% if qs %}&{{ qs }}{% endif %}">Starsze</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

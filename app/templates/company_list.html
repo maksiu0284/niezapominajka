@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, term_row with context %}
+{% block title %}{{ meta.label }}{% endblock %}
+{% block content %}
+{% set views = [("all", "Otwarte"), ("todo", "Do zrobienia"), ("overdue", "Po terminie"), ("done", "Wykonane")] %}
+<div class="page-head m-{{ module }}">
+  <div class="row">
+    <span class="micon">{{ icon(meta.icon) }}</span>
+    <div><h1>{{ meta.label }}</h1><p class="sub">Płatności, podatki, ZUS, licencje, umowy i inne terminy firmy</p></div>
+  </div>
+  <div class="page-actions">
+    <a class="btn" href="/eksport/terminy.xlsx?modul=company&widok={{ view }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ icon("download") }}Excel</a>
+    <a class="btn" href="/eksport/terminy.csv?modul=company&widok={{ view }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ icon("download") }}CSV</a>
+    {% if perms[module].add %}<a class="btn btn-primary" href="/terminy/nowy?modul=company">{{ icon("plus") }}{{ meta.new }}</a>{% endif %}
+  </div>
+</div>
+<form class="toolbar" method="get" role="search">
+  <input type="hidden" name="widok" value="{{ view }}">
+  <label class="search"><span class="sr-only">Szukaj</span>{{ icon("search") }}<input type="search" name="q" value="{{ q }}" placeholder="Szukaj: kontrahent, nr dokumentu, sprawa…"></label>
+  <button class="btn" type="submit">Szukaj</button>
+  {% if q %}<a class="btn btn-ghost" href="/m/company?widok={{ view }}">{{ icon("x") }}Wyczyść</a>{% endif %}
+</form>
+<div class="chips" style="margin-bottom:var(--space-5)">
+  {% for key, label in views %}<a class="chip {{ 'active' if view == key }}" href="/m/company?widok={{ key }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ label }}</a>{% endfor %}
+</div>
+{% if terms %}
+<div class="terms">{% for t in terms %}{{ term_row(t, perms) }}{% endfor %}</div>
+{% else %}
+<div class="card empty">{{ icon("briefcase") }}<h3>Brak terminów</h3><p>Dodaj płatność, podatek lub inną sprawę firmy.</p>
+  {% if perms[module].add %}<a class="btn btn-primary" href="/terminy/nowy?modul=company">{{ icon("plus") }}{{ meta.new }}</a>{% endif %}</div>
+{% endif %}
+{% endblock %}

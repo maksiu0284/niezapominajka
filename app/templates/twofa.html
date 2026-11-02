@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, errors_box with context %}
+{% block title %}Logowanie dwuetapowe{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/profil">Mój profil</a></div>
+<div class="page-head"><div><h1>Logowanie dwuetapowe</h1><p class="sub">Oprócz hasła program prosi o kod z aplikacji w telefonie.</p></div></div>
+{{ errors_box(errors) }}
+{% if not enabled_globally %}
+<div class="notice">{{ icon("info") }}<span class="grow">Właściciel nie włączył logowania dwuetapowego w programie{% if is_owner %} – możesz to zrobić w <a href="/panel/ustawienia#bezpieczenstwo">Ustawieniach</a>{% endif %}.</span></div>
+{% elif user.totp_enabled %}
+<div class="card card-pad stack">
+  <h2>{{ icon("check") }} Włączone</h2>
+  <p class="small">Przy każdym logowaniu program poprosi o kod z aplikacji. Jeśli zmieniasz telefon, skonfiguruj logowanie od nowa.</p>
+  <div class="grid grid-2" style="align-items:start">
+    <form method="post" action="/profil/2fa/od-nowa" class="form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label for="cur1">Obecne hasło</label><input type="password" name="current" id="cur1" autocomplete="current-password" required></div>
+      <button class="btn" type="submit">{{ icon("repeat") }}Skonfiguruj od nowa (nowy telefon)</button>
+    </form>
+    {% if not is_owner %}
+    <form method="post" action="/profil/2fa/wylacz" class="form" data-confirm="Wyłączyć logowanie dwuetapowe na Twoim koncie?" data-confirm-title="Wyłącz" data-confirm-ok="Wyłącz">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field"><label for="cur2">Obecne hasło</label><input type="password" name="current" id="cur2" autocomplete="current-password" required></div>
+      <button class="btn btn-danger" type="submit">{{ icon("x") }}Wyłącz</button>
+    </form>
+    {% else %}
+    <p class="small muted">Dla właścicieli logowanie dwuetapowe jest obowiązkowe, dopóki jest włączone w Ustawieniach.</p>
+    {% endif %}
+  </div>
+</div>
+{% elif setup %}
+{% if required %}<div class="notice">{{ icon("shield") }}<span class="grow">Logowanie dwuetapowe jest obowiązkowe dla właścicieli. Skonfiguruj je, aby korzystać z programu.</span></div>{% endif %}
+<div class="grid grid-2" style="align-items:start">
+  <div class="card card-pad stack">
+    <h2>1. Zeskanuj kod</h2>
+    <p class="small">Zainstaluj w telefonie aplikację uwierzytelniającą (np. Google Authenticator, Microsoft Authenticator, Aegis, 2FAS), wybierz „Dodaj konto” i zeskanuj kod:</p>
+    <div class="qr">{{ setup.qr|safe }}</div>
+    <p class="small">Nie możesz zeskanować? Wpisz klucz ręcznie:</p>
+    <div class="code-box" id="totp-key">{{ setup.secret }}</div>
+    <div class="row"><button class="btn btn-sm" type="button" data-copy="totp-key">{{ icon("copy") }}Kopiuj klucz</button>
+      <a class="btn btn-sm" href="{{ setup.uri }}">{{ icon("phone") }}Otwórz w aplikacji (telefon)</a></div>
+  </div>
+  <form method="post" action="/profil/2fa/wlacz" class="card card-pad form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>2. Wpisz kod z aplikacji</h2>
+    <div class="field"><label for="code">6-cyfrowy kod</label>
+      <input type="text" name="code" id="code" inputmode="numeric" maxlength="7" autocomplete="one-time-code" required class="code-input"></div>
+    <p class="xs muted">Kod zmienia się co 30 sekund. Czas w telefonie i na serwerze musi być ustawiony automatycznie.</p>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("check") }}Włącz logowanie dwuetapowe</button></div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

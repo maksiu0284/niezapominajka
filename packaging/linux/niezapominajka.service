@@ -1,0 +1,24 @@
+[Unit]
+Description=Niezapominajka – przypominajka ważnych terminów w firmie
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=niezapominajka
+Group=niezapominajka
+Environment=NIEZAPOMINAJKA_DANE=/var/lib/niezapominajka
+Environment=NIEZAPOMINAJKA_PORT=8000
+Environment=PYTHONDONTWRITEBYTECODE=1
+WorkingDirectory=/opt/niezapominajka
+ExecStart=/opt/niezapominajka/python/bin/python3 -s /opt/niezapominajka/app/run.py --serwer
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/niezapominajka
+
+[Install]
+WantedBy=multi-user.target

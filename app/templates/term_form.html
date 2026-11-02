@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, errors_box with context %}
+{% set editing = term.id is defined and term.id %}
+{% set recurring = term.recurring or term.interval_value %}
+{% block title %}{{ "Edycja terminu" if editing else "Nowy termin" }}{% endblock %}
+{% block content %}
+<div class="crumbs m-{{ module }}"><span class="mtag"><span class="mdot" style="width:6px;height:6px;border-radius:50%"></span>{{ meta.label }}</span></div>
+<div class="page-head"><h1>{{ "Edycja terminu" if editing else "Nowy termin" }}</h1></div>
+
+<form method="post" enctype="multipart/form-data" action="{{ '/terminy/%s/edycja'|format(term.id) if editing else '/terminy/nowy' }}" class="card card-pad form" id="term-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="module" value="{{ module }}">
+  {% if not editing and term.object_id and meta.has_objects %}<input type="hidden" name="back" value="/m/{{ module }}/{{ term.object_id }}">{% endif %}
+  {{ errors_box(errors) }}
+
+  <div class="form-grid">
+    {% if meta.has_objects %}
+    <div class="field full">
+      <label for="object_id">{{ meta.single }} <span class="req">*</span></label>
+      <select name="object_id" id="object_id" required data-object-select>
+        <option value="">— wybierz —</option>
+        {% for o in objects %}<option value="{{ o.id }}" data-resp="{{ o.resp or '' }}" {{ 'selected' if term.object_id == o.id }}>{{ o.display }}</option>{% endfor %}
+      </select>
+      {% if not objects %}<span class="hint">Najpierw dodaj rekord w module {{ meta.label }}.</span>{% endif %}
+    </div>
+    {% endif %}
+
+    <div class="field">
+      <label for="category">Rodzaj sprawy <span class="req">*</span></label>
+      {% set names = cats|map(attribute="name")|list %}
+      <select name="category" id="category" required data-category-select>
+        <option value="">— wybierz —</option>
+        {% for cat in cats %}<option value="{{ cat.name }}" data-iv="{{ cat.interval_value or '' }}" data-iu="{{ cat.interval_unit or '' }}" {{ 'selected' if term.category == cat.name }}>{{ cat.name }}{% if cat.interval_value %} (co {{ cat.interval_value }} {{ UNITS[cat.interval_unit] }}){% endif %}</option>{% endfor %}
+        {% if term.category and term.category not in names %}<option value="{{ term.category }}" selected>{{ term.category }}</option>{% endif %}
+        <option value="__new__">+ inny rodzaj…</option>
+      </select>
+      <input type="text" name="category_new" id="category_new" placeholder="Nazwa nowego rodzaju sprawy" hidden class="mt-2">
+      {% if is_owner %}<span class="hint" data-new-hint hidden>Nowy rodzaj zostanie dodany do listy.</span>{% endif %}
+    </div>
+    <div class="field">
+      <label for="title">Opis / szczegół</label>
+      <input type="text" name="title" id="title" value="{{ term.title or '' }}" placeholder="{{ 'np. faktura za prąd' if module == 'company' else 'np. kat. C+E, wymiana rozrządu' }}">
+    </div>
+
+    <div class="field">
+      <label for="due_date">Termin <span class="req">*</span></label>
+      <input type="date" name="due_date" id="due_date" value="{{ term.due_date or '' }}" required>
+    </div>
+    <div class="field">
+      <label for="responsible_employee_id">Osoba odpowiedzialna</label>
+      <select name="responsible_employee_id" id="responsible_employee_id">
+        <option value="">— brak —</option>
+        {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if term.responsible_employee_id == e.id }}>{{ e.last_name }} {{ e.first_name }}{% if e.position %} ({{ e.position }}){% endif %}</option>{% endfor %}
+      </select>
+      <span class="hint">Ta osoba otrzyma powiadomienie SMS / e-mail.</span>
+    </div>
+
+    <div class="field full">
+      <div class="recur-box stack">
+        <label class="check"><input type="checkbox" name="recurring" value="1" id="recurring" {{ 'checked' if recurring }} data-recurring>
+          <span><strong>Termin cykliczny</strong><br><span class="muted xs">Po oznaczeniu „wykonane” program zaproponuje kolejny termin.</span></span></label>
+        <div class="inline" id="recur-fields" {% if not recurring %}hidden{% endif %}>
+          <span style="flex:none" class="small">co</span>
+          <input type="number" name="interval_value" id="interval_value" min="1" max="120" value="{{ term.interval_value or '' }}" aria-label="Co ile">
+          <select name="interval_unit" id="interval_unit" aria-label="Jednostka">
+            {% for k, v in UNITS.items() %}<option value="{{ k }}" {{ 'selected' if (term.interval_unit or 'months') == k }}>{{ v }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="remind_days">Przypomnij wcześniej (dni)</label>
+      <input type="number" name="remind_days" id="remind_days" min="0" max="365" value="{{ term.remind_days if term.get('remind_days') is not none else '' }}" placeholder="domyślnie {{ settings.remind_days }}">
+      <span class="hint">Puste = ustawienie ogólne ({{ settings.remind_days }} dni).</span>
+    </div>
+    <div class="field">
+      <label for="counterparty">{{ "Kontrahent / urząd" if module == "company" else "Wykonawca / ubezpieczyciel" }}</label>
+      <input type="text" name="counterparty" id="counterparty" value="{{ term.counterparty or '' }}">
+    </div>
+    <div class="field">
+      <label for="amount">Kwota (zł)</label>
+      <input type="text" inputmode="decimal" name="amount" id="amount" value="{{ ('%.2f'|format(term.amount))|replace('.', ',') if term.get('amount') is not none else '' }}">
+    </div>
+    <div class="field">
+      <label for="document_number">Nr dokumentu / polisy / faktury</label>
+      <input type="text" name="document_number" id="document_number" value="{{ term.document_number or '' }}">
+    </div>
+    <div class="field full">
+      <label for="notes">Uwagi</label>
+      <textarea name="notes" id="notes" rows="3">{{ term.notes or '' }}</textarea>
+    </div>
+    <div class="field full">
+      <label for="files">Załączniki</label>
+      <input type="file" name="files" id="files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ods,.odt,.odp,.ppt,.pptx,.txt,.rtf,.csv,image/*">
+      <span class="hint">Dokumenty biurowe (PDF, Word, Excel, OpenOffice) i zdjęcia, do 25 MB każdy.</span>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <a class="btn" href="{{ '/terminy/%s'|format(term.id) if editing else ('/m/%s/%s'|format(module, term.object_id) if term.object_id else ('/m/' ~ module)) }}">Anuluj</a>
+    <span class="spacer"></span>
+    <button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz termin</button>
+  </div>
+</form>
+{% endblock %}

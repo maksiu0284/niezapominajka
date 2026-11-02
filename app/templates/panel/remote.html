@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs, errors_box with context %}
+{% block title %}Dostęp zdalny{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Dostęp zdalny</h1><p class="sub">Korzystanie z programu spoza sieci firmowej – telefonem w terenie albo z domu.</p></div></div>
+{{ panel_tabs("remote") }}
+{% if settings.remote_mode != "off" and settings.twofa_enabled != "1" %}
+<div class="notice notice-warn">{{ icon("alert") }}<span class="grow">Przy dostępie spoza firmy włącz logowanie dwuetapowe.</span><a class="btn btn-sm" href="/panel/ustawienia#bezpieczenstwo">Ustawienia</a></div>
+{% endif %}
+{% if output %}
+<div class="flash flash-{{ 'ok' if output.ok else 'error' }}" style="margin-bottom:var(--space-4)">{{ icon("info") }}<pre class="cmd-out">{{ output.text }}</pre></div>
+{% endif %}
+<div class="grid grid-3" style="margin-bottom:var(--space-5)">
+  <div class="card card-pad"><p class="muted small">Sieć firmowa</p><p><code>{{ lan }}</code></p></div>
+  <div class="card card-pad"><p class="muted small">Tailscale na tym komputerze</p><p>{% if st.tailscale %}<span class="pill pill-owner">zainstalowany</span>{% if st.ts_name %} <span class="xs">{{ st.ts_name }}</span>{% endif %}{% else %}<span class="pill">brak</span>{% endif %}</p></div>
+  <div class="card card-pad"><p class="muted small">Cloudflare Tunnel</p><p>{% if st.cloudflared %}<span class="pill pill-owner">cloudflared zainstalowany</span>{% else %}<span class="pill">brak</span>{% endif %}</p></div>
+</div>
+
+<form method="post" action="/panel/dostep-zdalny" class="card card-pad form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {{ errors_box(errors) }}
+  <h2>Sposób dostępu</h2>
+  <div class="stack">
+    {% for k, v in modes.items() %}
+    <label class="check"><input type="radio" name="remote_mode" value="{{ k }}" {{ 'checked' if (settings.remote_mode or 'off') == k }}> {{ v }}</label>
+    {% endfor %}
+  </div>
+  <div class="form-grid">
+    <div class="field full"><label for="public_url">Adres publiczny programu</label><input type="url" name="public_url" id="public_url" value="{{ settings.public_url }}" placeholder="https://serwer.twoja-siec.ts.net">
+      <span class="hint">Używany w linkach w e-mailach i w adresie kalendarza. Pusty = adres w sieci firmowej.</span></div>
+  </div>
+  <details>
+    <summary class="small">HTTPS bezpośrednio w programie (zaawansowane – tylko przy własnym certyfikacie)</summary>
+    <div class="form-grid mt-2">
+      <div class="field"><label for="https_cert">Plik certyfikatu (.pem / .crt)</label><input type="text" name="https_cert" id="https_cert" value="{{ settings.https_cert }}"></div>
+      <div class="field"><label for="https_key">Plik klucza (.key)</label><input type="text" name="https_key" id="https_key" value="{{ settings.https_key }}"></div>
+    </div>
+    <p class="xs muted">Program uruchomi się wtedy pod adresem https://. Przy Tailscale i Cloudflare nie jest to potrzebne – szyfrowanie zapewnia tunel.</p>
+  </details>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz</button></div>
+</form>
+
+<div class="grid grid-2 mt-6" style="align-items:start">
+  <section class="card card-pad stack">
+    <h2>Tailscale (zalecane)</h2>
+    <p class="small">Prywatna, szyfrowana sieć między Twoimi urządzeniami. Nie trzeba otwierać portów na routerze. Darmowy plan wystarcza małej firmie.</p>
+    <ol class="small">
+      <li>Załóż konto na <a href="https://tailscale.com/download" target="_blank" rel="noopener">tailscale.com</a> i zainstaluj Tailscale na tym komputerze{% if not st.tailscale %} (Windows: instalator; Linux: <code>curl -fsSL https://tailscale.com/install.sh | sh</code>, potem <code>sudo tailscale up</code>){% endif %}.</li>
+      <li>Zainstaluj aplikację Tailscale na telefonach i zaloguj się tym samym kontem (lub zaproś pracowników).</li>
+      <li>W panelu Tailscale włącz <strong>MagicDNS</strong> i <strong>HTTPS Certificates</strong>.</li>
+      <li>Naciśnij przycisk poniżej (albo wpisz <code>tailscale serve --bg {{ port }}</code>). Program będzie dostępny pod <code>https://{{ st.ts_name or "nazwa-komputera.twoja-siec.ts.net" }}</code>.</li>
+    </ol>
+    {% if st.tailscale %}
+    <div class="row">
+      <form method="post" action="/panel/dostep-zdalny/tailscale"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="on"><button class="btn btn-primary btn-sm" type="submit">{{ icon("globe") }}Udostępnij przez Tailscale</button></form>
+      <form method="post" action="/panel/dostep-zdalny/tailscale"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="off"><button class="btn btn-sm" type="submit">{{ icon("x") }}Wyłącz udostępnianie</button></form>
+    </div>
+    {% if st.ts_serve %}<pre class="cmd-out xs">{{ st.ts_serve }}</pre>{% endif %}
+    <p class="xs muted">Na Linuksie polecenie może wymagać jednorazowo <code>sudo tailscale set --operator=$USER</code>.</p>
+    {% endif %}
+  </section>
+  <section class="card card-pad stack">
+    <h2>Cloudflare Tunnel</h2>
+    <p class="small">Dostęp przez zwykłą przeglądarkę bez instalowania aplikacji na telefonach. Wymaga darmowego konta Cloudflare; na stałe – własnej domeny.</p>
+    <ol class="small">
+      <li>Zainstaluj <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" rel="noopener">cloudflared</a>.</li>
+      <li>Szybki test (adres tymczasowy): <code>cloudflared tunnel --url http://localhost:{{ port }}</code> – w oknie pojawi się adres <code>https://…trycloudflare.com</code>.</li>
+      <li>Na stałe: w panelu Cloudflare Zero Trust utwórz tunel, skieruj go na <code>http://localhost:{{ port }}</code> i zainstaluj go jako usługę poleceniem pokazanym w panelu.</li>
+      <li>Wpisz adres tunelu w polu „Adres publiczny” powyżej. Opcjonalnie dodaj Cloudflare Access (logowanie e-mailem) jako dodatkową ochronę.</li>
+    </ol>
+  </section>
+</div>
+<section class="card card-pad stack mt-6">
+  <h2>Własny serwer pośredniczący</h2>
+  <p class="small">Jeśli firma ma własną domenę i serwer, ustaw Caddy lub nginx jako serwer pośredniczący z HTTPS na <code>http://127.0.0.1:{{ port }}</code>. Przykład dla Caddy: <code>niezapominajka.firma.pl {</code> <code>reverse_proxy 127.0.0.1:{{ port }}</code> <code>}</code>. Nie przekierowuj portu {{ port }} z routera bez HTTPS.</p>
+</section>
+{% endblock %}

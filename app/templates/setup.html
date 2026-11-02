@@ -1,0 +1,68 @@
+{% extends "auth_base.html" %}
+{% from "macros.html" import icon, password_field, errors_box with context %}
+{% block title %}Kreator wdrożenia{% endblock %}
+{% block card_class %}wide{% endblock %}
+{% block content %}
+<div class="steps" aria-hidden="true">{% for i in [1,2,3] %}<span class="st {{ 'on' if i <= step }}"></span>{% endfor %}</div>
+<p class="step-label">Krok {{ step }} z 3</p>
+
+{% if step == 1 %}
+<form method="post" action="/kreator/firma" class="form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div><h1>Witaj w programie</h1>
+  <p class="muted mt-2">Kreator przeprowadzi Cię przez wdrożenie: podasz dane firmy, utworzysz konto głównego właściciela z silnym hasłem i otrzymasz kod odzyskiwania.</p></div>
+  {{ errors_box(errors) }}
+  <div class="field"><label for="company_name">Nazwa firmy <span class="req">*</span></label>
+    <input type="text" name="company_name" id="company_name" value="{{ data.company_name or '' }}" required autofocus></div>
+  <div class="form-grid">
+    <div class="field"><label for="remind_days">Przypominaj na ile dni przed terminem</label>
+      <input type="number" name="remind_days" id="remind_days" min="1" max="365" value="{{ data.remind_days or 30 }}" required>
+      <span class="hint">Termin pojawi się jako „wkrótce”.</span></div>
+    <div class="field"><label for="urgent_days">Oznacz jako pilne na ile dni przed</label>
+      <input type="number" name="urgent_days" id="urgent_days" min="0" max="365" value="{{ data.urgent_days if data.urgent_days is not none else 7 }}" required>
+      <span class="hint">Wszystko można zmienić później w ustawieniach.</span></div>
+  </div>
+  <div class="form-actions"><span class="spacer"></span><button class="btn btn-primary" type="submit">Dalej</button></div>
+</form>
+
+{% elif step == 2 %}
+{% set o = owner or {} %}
+<form method="post" action="/kreator/wlasciciel" class="form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div><h1>Konto głównego właściciela</h1>
+  <p class="muted mt-2">Główny właściciel ma pełny dostęp, dodaje użytkowników, nadaje uprawnienia i przegląda dziennik zdarzeń. Tego konta nie można usunąć.</p></div>
+  {{ errors_box(errors) }}
+  <div class="form-grid">
+    <div class="field"><label for="full_name">Imię i nazwisko <span class="req">*</span></label>
+      <input type="text" name="full_name" id="full_name" value="{{ o.full_name or '' }}" autocomplete="name" required autofocus></div>
+    <div class="field"><label for="username">Login <span class="req">*</span></label>
+      <input type="text" name="username" id="username" value="{{ o.username or '' }}" autocomplete="username" autocapitalize="none" minlength="3" required></div>
+    <div class="field"><label for="email">E-mail</label>
+      <input type="email" name="email" id="email" value="{{ o.email or '' }}" autocomplete="email"></div>
+    <div class="field"><label for="phone">Telefon</label>
+      <input type="tel" name="phone" id="phone" value="{{ o.phone or '' }}" autocomplete="tel"></div>
+  </div>
+  {{ password_field("password", "Hasło", "password", "username") }}
+  <div class="field"><label for="password2">Powtórz hasło <span class="req">*</span></label>
+    <input type="password" name="password2" id="password2" autocomplete="new-password" required></div>
+  <div class="form-actions"><a class="btn" href="/kreator?krok=1">{{ icon("back") }}Wstecz</a><span class="spacer"></span>
+    <button class="btn btn-primary" type="submit">Utwórz konto</button></div>
+</form>
+
+{% else %}
+<form method="post" action="/kreator/zakoncz" class="form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div><h1>Kod odzyskiwania</h1>
+  <p class="muted mt-2">Jeśli zapomnisz hasła, ten kod pozwoli ustawić nowe. Program pokazuje go tylko raz i przechowuje wyłącznie w postaci zaszyfrowanej. Pobierz plik albo wydrukuj kartkę i schowaj ją w bezpiecznym miejscu.</p></div>
+  {{ errors_box(errors) }}
+  <div class="code-box" id="code">{{ code }}</div>
+  <div class="row no-print">
+    <a class="btn" href="/kreator/kod.txt">{{ icon("download") }}Pobierz plik</a>
+    <button class="btn" type="button" onclick="window.print()">{{ icon("printer") }}Drukuj</button>
+    <button class="btn" type="button" data-copy="code">{{ icon("file") }}Kopiuj</button>
+  </div>
+  <label class="check no-print"><input type="checkbox" name="saved" value="1" required> Zapisałem kod odzyskiwania w bezpiecznym miejscu</label>
+  <div class="form-actions no-print"><span class="spacer"></span><button class="btn btn-primary" type="submit">{{ icon("check") }}Zakończ i przejdź do programu</button></div>
+</form>
+{% endif %}
+{% endblock %}

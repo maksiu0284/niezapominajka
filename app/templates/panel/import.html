@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs with context %}
+{% block title %}Import z Excela{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Import z Excela</h1><p class="sub">Szybkie wprowadzenie pracowników, pojazdów, maszyn i terminów z arkusza.</p></div>
+  <div class="page-actions"><a class="btn" href="/panel/import/wzor.xlsx">{{ icon("download") }}Pobierz wzór</a></div></div>
+{{ panel_tabs("import") }}
+{% if not preview %}
+<div class="grid grid-2" style="align-items:start">
+  <div class="card card-pad stack">
+    <h2>Jak to działa</h2>
+    <ol class="small">
+      <li>Pobierz wzór. Arkusz „Instrukcja” opisuje kolumny i pokazuje przykład wiersza.</li>
+      <li>Uzupełnij arkusze Pracownicy, Pojazdy, Maszyny i Terminy. Puste arkusze są pomijane.</li>
+      <li>W arkuszu Terminy wskaż obiekt: pracownika (imię i nazwisko), pojazd (numer rejestracyjny), maszynę (nazwa lub numer) albo zostaw puste dla spraw firmy.</li>
+      <li>Wgraj plik. Program pokaże podgląd i ewentualne błędy. Nic nie zostanie zapisane przed zatwierdzeniem.</li>
+    </ol>
+    <p class="xs muted">Istniejące rekordy (ten sam pracownik, rejestracja, numer maszyny) nie są dublowane – terminy są dopisywane do nich.</p>
+  </div>
+  <form method="post" action="/panel/import" enctype="multipart/form-data" class="card card-pad form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>Wgraj plik</h2>
+    {% if upload_error %}<div class="errors" role="alert">{{ upload_error }}</div>{% endif %}
+    {% if errors %}<div class="errors" role="alert"><strong>Plik zawiera błędy – popraw je i wgraj ponownie:</strong>
+      <ul>{% for sheet, row, msg in errors[:50] %}<li>{{ sheet }}{% if row %}, wiersz {{ row }}{% endif %}: {{ msg }}</li>{% endfor %}</ul>
+      {% if errors|length > 50 %}<p>… i {{ errors|length - 50 }} więcej</p>{% endif %}</div>{% endif %}
+    <div class="field"><label for="file">Plik Excel (.xlsx)</label><input type="file" name="file" id="file" accept=".xlsx" required></div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("upload") }}Sprawdź plik</button></div>
+  </form>
+</div>
+{% else %}
+<div class="card card-pad stack">
+  <h2>Podgląd: {{ preview.filename }}</h2>
+  {% if errors %}<div class="errors" role="alert"><strong>Plik zawiera błędy – nic nie zostanie zapisane:</strong>
+    <ul>{% for sheet, row, msg in errors[:50] %}<li>{{ sheet }}{% if row %}, wiersz {{ row }}{% endif %}: {{ msg }}</li>{% endfor %}</ul></div>{% endif %}
+  <div class="grid grid-3">
+    <div class="card card-pad"><p class="muted small">Pracownicy w pliku</p><p class="big">{{ preview.employees }}</p></div>
+    <div class="card card-pad"><p class="muted small">Pojazdy / maszyny w pliku</p><p class="big">{{ preview.vehicles }} / {{ preview.machines }}</p></div>
+    <div class="card card-pad"><p class="muted small">Terminy / nowe rodzaje spraw</p><p class="big">{{ preview.terms }} / {{ preview.categories }}</p></div>
+  </div>
+  {% if warnings %}<div class="notice">{{ icon("info") }}<div class="grow small"><strong>Uwagi:</strong><ul>{% for sheet, row, msg in warnings[:30] %}<li>{{ sheet }}{% if row %}, wiersz {{ row }}{% endif %}: {{ msg }}</li>{% endfor %}</ul></div></div>{% endif %}
+  {% if preview.sample_terms %}
+  <div class="table-wrap"><table class="table resp">
+    <thead><tr><th>Wiersz</th><th>Moduł</th><th>Obiekt</th><th>Sprawa</th><th>Termin</th></tr></thead>
+    <tbody>{% for t in preview.sample_terms %}<tr><td>{{ t.row }}</td><td data-l="Moduł">{{ MODULES[t.module].label }}</td><td data-l="Obiekt">{{ t.object or "—" }}</td><td data-l="Sprawa">{{ t.category }}</td><td data-l="Termin">{{ t.due_date|d }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if preview.terms > preview.sample_terms|length %}<p class="xs muted">Pokazano {{ preview.sample_terms|length }} z {{ preview.terms }} terminów.</p>{% endif %}
+  {% endif %}
+  <div class="form-actions">
+    <a class="btn" href="/panel/import">{{ icon("x") }}Anuluj</a><span class="spacer"></span>
+    {% if token %}
+    <form method="post" action="/panel/import/zatwierdz"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="token" value="{{ token }}">
+      <button class="btn btn-primary" type="submit">{{ icon("check") }}Zatwierdź import</button></form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

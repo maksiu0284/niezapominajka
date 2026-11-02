@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs, errors_box, confirm_delete with context %}
+{% set editing = u.id is defined and u.id %}
+{% block title %}{{ "Konto: " ~ u.username if editing else "Nowe konto" }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/panel">Panel</a><span>/</span><a href="/panel/uzytkownicy">Użytkownicy</a></div>
+<div class="page-head"><h1>{{ "Konto: " ~ u.username if editing else "Nowe konto" }}</h1>
+  {% if editing %}<div class="page-actions">
+    {% if u.id != user.id %}
+    <form method="post" action="/panel/uzytkownicy/{{ u.id }}/haslo" data-confirm="Nadać nowe hasło tymczasowe dla {{ u.username }}? Obecne hasło przestanie działać, a użytkownik zostanie wylogowany." data-confirm-title="Hasło tymczasowe" data-confirm-ok="Nadaj hasło">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("key") }}Hasło tymczasowe</button></form>
+    {% endif %}
+    {% if u.totp_enabled and u.id != user.id %}
+    <form method="post" action="/panel/uzytkownicy/{{ u.id }}/2fa-reset" data-confirm="Wyłączyć logowanie dwuetapowe dla {{ u.username }} (np. po zgubieniu telefonu)? Użytkownik zostanie wylogowany." data-confirm-title="Logowanie dwuetapowe" data-confirm-ok="Wyłącz">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("shield") }}Wyłącz 2FA</button></form>
+    {% endif %}
+    {% if u.locked %}
+    <form method="post" action="/panel/uzytkownicy/{{ u.id }}/odblokuj"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("lock") }}Odblokuj</button></form>
+    {% endif %}
+    {% if not u.is_primary and u.id != user.id %}{{ confirm_delete("/panel/uzytkownicy/%s/usun"|format(u.id), "Usuń konto", "Usunąć konto „" ~ u.username ~ "”? Wpisy w dzienniku zdarzeń pozostaną.") }}{% endif %}
+  </div>{% endif %}
+</div>
+{{ panel_tabs("users") }}
+
+<form method="post" action="{{ '/panel/uzytkownicy/%s'|format(u.id) if editing else '/panel/uzytkownicy/nowy' }}" class="card card-pad form" data-user-form>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {{ errors_box(errors) }}
+  <div class="form-grid">
+    <div class="field"><label for="username">Login <span class="req">*</span></label>
+      <input type="text" name="username" id="username" value="{{ u.username or '' }}" autocapitalize="none" minlength="3" required></div>
+    <div class="field"><label for="full_name">Imię i nazwisko</label>
+      <input type="text" name="full_name" id="full_name" value="{{ u.full_name or '' }}"></div>
+    <div class="field"><label for="email">E-mail</label>
+      <input type="email" name="email" id="email" value="{{ u.email or '' }}"></div>
+    <div class="field"><label for="phone">Telefon (do SMS)</label>
+      <input type="tel" name="phone" id="phone" value="{{ u.phone or '' }}"></div>
+    <div class="field"><label for="role">Rola</label>
+      <select name="role" id="role" data-role-select {% if u.is_primary %}disabled{% endif %}>
+        <option value="user" {{ 'selected' if u.role != 'owner' }}>Użytkownik – uprawnienia według tabeli</option>
+        <option value="owner" {{ 'selected' if u.role == 'owner' }}>Właściciel – pełny dostęp i panel</option>
+      </select>
+      {% if u.is_primary %}<input type="hidden" name="role" value="owner"><span class="hint">Roli głównego właściciela nie można zmienić.</span>{% endif %}
+    </div>
+    <div class="field"><label for="employee_id">Powiązany pracownik</label>
+      <select name="employee_id" id="employee_id">
+        <option value="">— brak —</option>
+        {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if u.employee_id == e.id }}>{{ e.last_name }} {{ e.first_name }}</option>{% endfor %}
+      </select>
+      <span class="hint">Użytkownik zawsze widzi własne terminy i te, za które odpowiada.</span></div>
+    <div class="field"><label for="notify_channel">Codzienne zestawienie</label>
+      <select name="notify_channel" id="notify_channel">{% for k, v in USER_CHANNELS.items() %}<option value="{{ k }}" {{ 'selected' if (u.notify_channel or 'none') == k }}>{{ v }}</option>{% endfor %}</select>
+      <span class="hint">Automatyczna lista pilnych spraw z modułów, które użytkownik widzi.</span></div>
+    {% if not editing %}
+    <div class="field full"><label for="password">Hasło startowe</label>
+      <input type="text" name="password" id="password" autocomplete="off" placeholder="zostaw puste – program wygeneruje hasło tymczasowe">
+      <span class="hint">Przy pierwszym logowaniu użytkownik musi ustawić własne hasło.</span></div>
+    {% endif %}
+    <div class="field full">
+      {% if u.is_primary %}<input type="hidden" name="active" value="1">{% endif %}
+      <label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if u.active }} {% if u.is_primary %}disabled{% endif %}> Konto aktywne (może się logować)</label></div>
+  </div>
+
+  <fieldset id="perm-box" {% if u.role == 'owner' %}hidden{% endif %}>
+    <div class="fieldset-title">{{ icon("shield") }}Uprawnienia w modułach</div>
+    <div class="table-wrap">
+      <table class="perm-table">
+        <thead><tr><th>Moduł</th>{% for a, lbl in ACTIONS.items() %}<th>{{ lbl }}</th>{% endfor %}<th>Wszystko</th></tr></thead>
+        <tbody>
+        {% for m, meta in MODULES.items() %}
+        <tr class="m-{{ m }}" data-perm-row>
+          <td><span class="mtag">{{ meta.label }}</span></td>
+          {% for a in ACTIONS %}<td><input type="checkbox" name="p_{{ m }}_{{ a }}" value="1" data-perm="{{ a }}" aria-label="{{ meta.label }}: {{ ACTIONS[a] }}" {{ 'checked' if uperms[m][a] }}></td>{% endfor %}
+          <td><input type="checkbox" data-perm-all aria-label="{{ meta.label }}: wszystko"></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint xs muted mt-2">Każde prawo (dodawanie, edycja, usuwanie, powiadamianie) automatycznie włącza podgląd modułu. „Edycja” obejmuje też oznaczanie terminów jako wykonane i dodawanie plików.</p>
+  </fieldset>
+
+  <div class="form-actions"><a class="btn" href="/panel/uzytkownicy">Anuluj</a><span class="spacer"></span>
+    <button class="btn btn-primary" type="submit">{{ icon("check") }}{{ "Zapisz" if editing else "Utwórz konto" }}</button></div>
+</form>
+{% endblock %}

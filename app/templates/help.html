@@ -1,0 +1,103 @@
+{% extends ("base.html" if user else "auth_base.html") %}
+{% from "macros.html" import icon with context %}
+{% block title %}Pomoc{% endblock %}
+{% block card_class %}auth-wide{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Pomoc</h1><p class="sub">{{ APP_NAME }} {{ APP_VERSION }} – {{ APP_TAGLINE }}</p></div></div>
+<div class="help">
+<nav class="card card-pad help-toc no-print" aria-label="Spis treści">
+  <strong>Spis treści</strong>
+  <ol>
+    <li><a href="#start">Pierwsze kroki</a></li>
+    <li><a href="#terminy">Terminy i terminy cykliczne</a></li>
+    <li><a href="#powiadom">Powiadamianie ręczne (SMS, e-mail)</a></li>
+    <li><a href="#auto">Powiadomienia automatyczne</a></li>
+    <li><a href="#telefon">Telefon i dostęp zdalny</a></li>
+    <li><a href="#konta">Konta, uprawnienia, logowanie dwuetapowe</a></li>
+    <li><a href="#kalendarz">Kalendarz w telefonie</a></li>
+    <li><a href="#import">Import z Excela i eksport</a></li>
+    <li><a href="#kopie">Kopie zapasowe i dane</a></li>
+    <li><a href="#problemy">Najczęstsze problemy</a></li>
+  </ol>
+</nav>
+
+<section class="card card-pad stack" id="start">
+  <h2>{{ icon("home") }} Pierwsze kroki</h2>
+  <ol class="small">
+    <li>Przy pierwszym uruchomieniu kreator tworzy konto głównego właściciela i pokazuje <strong>kod odzyskiwania</strong>. Zapisz go lub wydrukuj – pozwala odzyskać dostęp bez hasła.</li>
+    <li>W <strong>Panelu właściciela → Ustawienia</strong> wpisz nazwę firmy i ustal, ile dni wcześniej program ma przypominać.</li>
+    <li>Dodaj pracowników, pojazdy i maszyny (albo wczytaj je z Excela – <a href="#import">Import</a>).</li>
+    <li>Dodawaj terminy: badania lekarskie, szkolenia BHP, OC/AC, przeglądy, UDT, podatki, ZUS, licencje.</li>
+    <li>Utwórz konta dla osób, które mają korzystać z programu, i nadaj im uprawnienia w modułach.</li>
+  </ol>
+</section>
+
+<section class="card card-pad stack" id="terminy">
+  <h2>{{ icon("calendar") }} Terminy i terminy cykliczne</h2>
+  <p class="small">Pulpit pokazuje terminy <span class="status s-overdue">po terminie</span>, <span class="status s-urgent">pilne</span> i <span class="status s-soon">wkrótce</span>. Okres „pilne” i „wkrótce” ustawia właściciel; pojedynczy termin może mieć własny okres przypomnienia.</p>
+  <p class="small">Termin cykliczny (np. przegląd co 12 miesięcy) po naciśnięciu <strong>Wykonane</strong> zapisuje datę wykonania i od razu planuje kolejny termin. Można przy tym dodać notatkę i pliki (np. skan zaświadczenia).</p>
+  <p class="small">Każdy termin może mieć <strong>osobę odpowiedzialną</strong> – to ją program powiadamia.</p>
+</section>
+
+<section class="card card-pad stack" id="powiadom">
+  <h2>{{ icon("sms") }} Powiadamianie ręczne</h2>
+  <p class="small">Przycisk {{ icon("sms") }} przy terminie otwiera okno z gotową treścią. „Otwórz SMS” uruchamia aplikację SMS w telefonie z numerem i tekstem – wysyłkę zatwierdzasz sam. „Kopiuj” kopiuje treść, np. do komunikatora. Na komputerze bez aplikacji SMS użyj e-maila lub przycisku „Kopiuj”.</p>
+  <p class="small">Treść wiadomości ustala właściciel w <strong>Ustawieniach → Szablony powiadomień</strong>. Każde powiadomienie trafia do dziennika zdarzeń.</p>
+</section>
+
+<section class="card card-pad stack" id="auto">
+  <h2>{{ icon("bell") }} Powiadomienia automatyczne</h2>
+  <p class="small">Opcjonalnie program może sam wysyłać przypomnienia raz dziennie o wybranej godzinie (<strong>Panel → Powiadomienia</strong>):</p>
+  <ul class="small">
+    <li><strong>E-mail</strong> – przez firmową skrzynkę (dane serwera SMTP od dostawcy poczty) albo Gmail. W Gmailu włącz weryfikację dwuetapową, utwórz <em>hasło aplikacji</em> i wpisz: serwer <code>smtp.gmail.com</code>, port <code>587</code>, STARTTLS, login = adres Gmail, hasło = hasło aplikacji.</li>
+    <li><strong>SMS przez SMSAPI</strong> (płatne) – w panelu SMSAPI utwórz token API z uprawnieniem do wysyłki SMS. Nazwa nadawcy musi być wcześniej zatwierdzona w SMSAPI; bez niej zostaw pole puste. Tryb testowy sprawdza połączenie bez wysyłki i bez opłat.</li>
+    <li><strong>SMS przez telefon z Androidem</strong> – zainstaluj aplikację „SMS Gateway for Android”. Tryb lokalny: telefon w tej samej sieci, w aplikacji włącz „Local server” i przepisz adres, login i hasło. Tryb chmurowy: dane z sekcji „Cloud server”. SMS-y idą z karty SIM telefonu według Twojej taryfy.</li>
+  </ul>
+  <p class="small">Osoba odpowiedzialna dostaje wiadomość raz na każdym etapie (wkrótce, pilne, po terminie), a po terminie – powtórnie co ustaloną liczbę dni. Kanał (e-mail, SMS, oba, brak) wybiera się w karcie pracownika. Użytkownicy mogą też zamówić codzienne zestawienie w swoim profilu.</p>
+</section>
+
+<section class="card card-pad stack" id="telefon">
+  <h2>{{ icon("phone") }} Telefon i dostęp zdalny</h2>
+  <p class="small">W sieci firmowej otwórz na telefonie adres serwera{% if lan %} (<code>{{ lan }}</code>){% endif %} i wybierz „Dodaj do ekranu głównego” – program działa jak aplikacja.</p>
+  <p class="small">Dostęp spoza firmy konfiguruje właściciel w <strong>Panelu → Dostęp zdalny</strong>. Zalecany jest <strong>Tailscale</strong> (prywatna sieć, bez otwierania portów) albo <strong>Cloudflare Tunnel</strong>. Przy dostępie zdalnym włącz logowanie dwuetapowe. Nie przekierowuj portu 8000 na routerze bez HTTPS.</p>
+</section>
+
+<section class="card card-pad stack" id="konta">
+  <h2>{{ icon("key") }} Konta i bezpieczeństwo</h2>
+  <ul class="small">
+    <li><strong>Właściciel</strong> widzi i zmienia wszystko, ma panel i dziennik zdarzeń. Właścicieli może być kilku; głównego nie można usunąć.</li>
+    <li><strong>Użytkownik</strong> ma uprawnienia w każdym module: podgląd, dodawanie, edycja, usuwanie, powiadamianie. Konto powiązane z pracownikiem widzi jego terminy w „Moje terminy”.</li>
+    <li>Zapomniane hasło: właściciel nadaje hasło tymczasowe. Główny właściciel może użyć kodu odzyskiwania.</li>
+    <li>Po 5 błędnych próbach logowania konto blokuje się na 15 minut.</li>
+    <li><strong>Logowanie dwuetapowe</strong> włącza właściciel w Ustawieniach. Wtedy jest obowiązkowe dla właścicieli, a użytkownicy mogą je włączyć w profilu. Zgubiony telefon: inny właściciel wyłącza je w karcie konta, a główny właściciel może użyć kodu odzyskiwania.</li>
+  </ul>
+</section>
+
+<section class="card card-pad stack" id="kalendarz">
+  <h2>{{ icon("calendar") }} Kalendarz w telefonie</h2>
+  <p class="small">W <strong>Moim profilu</strong> utwórz adres kalendarza i dodaj go w telefonie jako subskrypcję (Google Kalendarz: „Dodaj kalendarz → Z adresu URL” na komputerze; iPhone: Ustawienia → Kalendarz → Konta → Dodaj subskrypcję). Telefon musi mieć dostęp do serwera – w sieci firmowej albo przez dostęp zdalny. Pojedynczy plik .ics pobierzesz też z Pulpitu.</p>
+</section>
+
+<section class="card card-pad stack" id="import">
+  <h2>{{ icon("upload") }} Import z Excela i eksport</h2>
+  <p class="small">W <strong>Panelu → Import</strong> pobierz wzór arkusza, uzupełnij arkusze Pracownicy, Pojazdy, Maszyny i Terminy, a następnie wgraj plik. Program pokaże podgląd i błędy z numerami wierszy; nic nie zapisuje przed zatwierdzeniem. Przed importem robi kopię zapasową.</p>
+  <p class="small">Każdą listę można wyeksportować do Excela lub CSV i wydrukować.</p>
+</section>
+
+<section class="card card-pad stack" id="kopie">
+  <h2>{{ icon("archive") }} Kopie zapasowe i dane</h2>
+  <p class="small">Program robi kopię bazy raz na dobę (14 ostatnich) i przed importem. Kopię ręczną utworzysz i pobierzesz w <strong>Panelu → Kopie zapasowe</strong>. Kopia zawiera także hasła do poczty i bramki SMS – przechowuj ją bezpiecznie. Folder danych sprawdzisz na stronie <a href="/o-programie">O programie</a>.</p>
+</section>
+
+<section class="card card-pad stack" id="problemy">
+  <h2>{{ icon("alert") }} Najczęstsze problemy</h2>
+  <ul class="small">
+    <li><strong>Telefon nie otwiera strony</strong> – sprawdź, czy jest w tej samej sieci Wi-Fi i czy zapora systemu pozwala na port 8000 (instalator Windows dodaje regułę).</li>
+    <li><strong>„Otwórz SMS” nie wstawia treści</strong> – niektóre telefony ignorują treść w linku; użyj przycisku „Kopiuj” i wklej tekst.</li>
+    <li><strong>Gmail odrzuca hasło</strong> – potrzebne jest hasło aplikacji, nie zwykłe hasło do konta.</li>
+    <li><strong>Kod logowania nie pasuje</strong> – włącz automatyczny czas w telefonie i na serwerze.</li>
+    <li><strong>Windows ostrzega o nieznanym wydawcy</strong> – program nie jest podpisany; wybierz „Więcej informacji → Uruchom mimo to”.</li>
+  </ul>
+</section>
+</div>
+{% endblock %}

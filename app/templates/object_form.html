@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, errors_box with context %}
+{% set editing = obj.id is defined and obj.id %}
+{% block title %}{{ ("Edycja: " ~ meta.single|lower) if editing else meta.new }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/m/{{ module }}">{{ meta.label }}</a>{% if editing %}<span>/</span><a href="/m/{{ module }}/{{ obj.id }}">karta</a>{% endif %}</div>
+<div class="page-head"><h1>{{ ("Edycja: " ~ meta.single|lower) if editing else meta.new }}</h1></div>
+
+<form method="post" enctype="multipart/form-data" action="{{ '/m/%s/%s/edycja'|format(module, obj.id) if editing else '/m/%s/nowy'|format(module) }}" class="card card-pad form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {{ errors_box(errors) }}
+  <div class="form-grid">
+    {% for f in meta.fields %}
+    {% set v = obj.get(f.name) if obj.get(f.name) is not none else "" %}
+    <div class="field {{ 'full' if f.type == 'textarea' }}">
+      <label for="f_{{ f.name }}">{{ f.label }}{% if f.required %} <span class="req">*</span>{% endif %}</label>
+      {% if f.type == "textarea" %}
+        <textarea name="{{ f.name }}" id="f_{{ f.name }}" rows="3">{{ v }}</textarea>
+      {% elif f.type == "select" %}
+        <select name="{{ f.name }}" id="f_{{ f.name }}">
+          {% for k, lbl in f.options.items() %}<option value="{{ k }}" {{ 'selected' if (v or f.default) == k }}>{{ lbl }}</option>{% endfor %}
+        </select>
+        {% if f.hint %}<span class="hint">{{ f.hint }}</span>{% endif %}
+      {% elif f.type == "employee" %}
+        <select name="{{ f.name }}" id="f_{{ f.name }}">
+          <option value="">— brak —</option>
+          {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if v == e.id }}>{{ e.last_name }} {{ e.first_name }}{% if e.position %} ({{ e.position }}){% endif %}</option>{% endfor %}
+        </select>
+        <span class="hint">Domyślna osoba odpowiedzialna za terminy i odbiorca powiadomień.</span>
+      {% else %}
+        <input type="{{ {'number': 'number', 'date': 'date', 'tel': 'tel', 'email': 'email'}.get(f.type, 'text') }}" name="{{ f.name }}" id="f_{{ f.name }}" value="{{ v }}"
+          {% if f.required %}required{% endif %} {% if f.upper %}style="text-transform:uppercase" autocapitalize="characters"{% endif %}
+          {% if f.type == 'tel' %}inputmode="tel" placeholder="np. 600 100 200"{% endif %} {% if f.name == 'production_year' %}min="1950" max="2100"{% endif %}>
+        {% if f.type == 'tel' %}<span class="hint">Numer do SMS. Bez kierunkowego program doda +48.</span>{% endif %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if custom %}
+  <fieldset>
+    <div class="fieldset-title">{{ icon("tag") }}Pola dodatkowe</div>
+    <div class="form-grid">
+      {% for cf in custom %}
+      <div class="field">
+        <label for="cf_{{ cf.id }}">{{ cf.name }}{% if cf.required %} <span class="req">*</span>{% endif %}</label>
+        <input type="{{ {'number': 'text', 'date': 'date'}.get(cf.field_type, 'text') }}" {% if cf.field_type == 'number' %}inputmode="decimal"{% endif %}
+               name="cf_{{ cf.id }}" id="cf_{{ cf.id }}" value="{{ cvalues.get(cf.id, '') or '' }}" {% if cf.required %}required{% endif %}>
+      </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endif %}
+
+  <fieldset>
+    <div class="fieldset-title">{{ icon("image") }}Zdjęcie</div>
+    <div class="row">
+      {% if editing and obj.photo_path %}
+      <img src="/zdjecie/{{ module }}/{{ obj.id }}" alt="Aktualne zdjęcie" style="width:72px;height:72px;object-fit:cover;border-radius:14px">
+      <label class="check"><input type="checkbox" name="remove_photo" value="1"> Usuń obecne zdjęcie</label>
+      {% endif %}
+      <input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment">
+    </div>
+    <p class="hint xs muted mt-2">JPG, PNG, WEBP lub GIF, do 25 MB. Na telefonie możesz od razu zrobić zdjęcie.</p>
+  </fieldset>
+
+  <div class="form-actions">
+    <a class="btn" href="{{ '/m/%s/%s'|format(module, obj.id) if editing else '/m/' ~ module }}">Anuluj</a>
+    <span class="spacer"></span>
+    <button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz</button>
+  </div>
+</form>
+{% endblock %}

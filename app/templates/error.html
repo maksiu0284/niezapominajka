@@ -1,0 +1,12 @@
+{% extends "auth_base.html" %}
+{% from "macros.html" import icon with context %}
+{% block title %}Błąd {{ code }}{% endblock %}
+{% block content %}
+<div class="stack">
+  <p class="step-label">Kod {{ code }}</p>
+  <h1>{{ "Brak dostępu" if code == 403 else ("Nie znaleziono" if code == 404 else "Coś poszło nie tak") }}</h1>
+  <p class="muted">{{ message }}</p>
+  <div class="form-actions"><a class="btn btn-primary" href="/">{{ icon("home") }}Wróć na pulpit</a>
+  <button class="btn" type="button" onclick="history.back()">{{ icon("back") }}Cofnij</button></div>
+</div>
+{% endblock %}

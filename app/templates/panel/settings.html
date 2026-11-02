@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs, errors_box with context %}
+{% block title %}Ustawienia{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Ustawienia</h1></div>
+{{ panel_tabs("settings") }}
+<form method="post" action="/panel/ustawienia" class="form" id="settings-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {{ errors_box(errors) }}
+  <div class="card card-pad form">
+    <h2>Firma i przypomnienia</h2>
+    <div class="form-grid">
+      <div class="field full"><label for="company_name">Nazwa firmy <span class="req">*</span></label><input type="text" name="company_name" id="company_name" value="{{ settings.company_name }}" required></div>
+      <div class="field"><label for="remind_days">Przypominaj na ile dni przed terminem</label><input type="number" name="remind_days" id="remind_days" min="1" max="365" value="{{ settings.remind_days }}" required>
+        <span class="hint">Pojedynczy termin może mieć własny okres.</span></div>
+      <div class="field"><label for="urgent_days">Pilne na ile dni przed</label><input type="number" name="urgent_days" id="urgent_days" min="0" max="365" value="{{ settings.urgent_days }}" required></div>
+    </div>
+  </div>
+  <div class="card card-pad form">
+    <div><h2>Szablony powiadomień</h2>
+    <p class="small muted mt-2">Dostępne pola: <code>{osoba}</code> imię odbiorcy, <code>{firma}</code>, <code>{sprawa}</code>, <code>{obiekt}</code> (pracownik, pojazd, maszyna), <code>{termin}</code> data, <code>{ile}</code> np. „za 5 dni”, <code>{nadawca}</code> Twoje imię i nazwisko.</p></div>
+    <div class="field"><label for="template_sms">Treść SMS</label><textarea name="template_sms" id="template_sms" rows="3">{{ settings.template_sms }}</textarea>
+      <span class="hint"><span data-count="template_sms"></span> znaków. SMS z polskimi znakami mieści 70 znaków na część.</span></div>
+    <div class="field"><label for="template_email_subject">Temat e-mail</label><input type="text" name="template_email_subject" id="template_email_subject" value="{{ settings.template_email_subject }}"></div>
+    <div class="field"><label for="template_email_body">Treść e-mail</label><textarea name="template_email_body" id="template_email_body" rows="9">{{ settings.template_email_body }}</textarea></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz ustawienia</button></div>
+</form>
+<form method="post" action="/panel/ustawienia/domyslne-szablony" class="mt-4" data-confirm="Przywrócić domyślną treść SMS i e-mail?" data-confirm-title="Domyślne szablony" data-confirm-ok="Przywróć">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-ghost btn-sm" type="submit">{{ icon("undo") }}Przywróć domyślne szablony</button></form>
+
+<div class="card card-pad form mt-6" id="bezpieczenstwo">
+  <h2>{{ icon("shield") }} Bezpieczeństwo i aktualizacje</h2>
+  <form method="post" action="/panel/ustawienia/bezpieczenstwo" class="form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="check"><input type="checkbox" name="twofa_enabled" value="1" {{ 'checked' if settings.twofa_enabled == '1' }}>
+      <span><strong>Logowanie dwuetapowe (kod z aplikacji w telefonie)</strong><br><span class="xs muted">Obowiązkowe dla właścicieli, dobrowolne dla użytkowników. Zalecane przy dostępie zdalnym. Po włączeniu skonfigurujesz je od razu na swoim koncie.</span></span></label>
+    <label class="check"><input type="checkbox" name="update_check" value="1" {{ 'checked' if settings.update_check == '1' }}>
+      <span><strong>Sprawdzaj raz dziennie, czy jest nowa wersja</strong><br><span class="xs muted">Program pyta stronę projektu na GitHubie o numer najnowszej wersji. Nie wysyła żadnych danych firmy. Aktualizację instalujesz sam.</span></span></label>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz</button></div>
+  </form>
+  <form method="post" action="/panel/aktualizacje/sprawdz" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn btn-sm" type="submit">{{ icon("repeat") }}Sprawdź aktualizacje teraz</button>
+    <span class="xs muted">Twoja wersja: {{ APP_VERSION }}{% if settings.update_checked_at %} · sprawdzono {{ settings.update_checked_at[:10]|d }}{% endif %}{% if settings.update_latest %} · najnowsza: {{ settings.update_latest }}{% endif %}</span>
+  </form>
+</div>
+{% endblock %}

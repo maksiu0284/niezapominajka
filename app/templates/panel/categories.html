@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, panel_tabs with context %}
+{% block title %}Rodzaje spraw{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Rodzaje spraw</h1><p class="sub">Domyślny cykl podpowiada się przy dodawaniu terminu. Zmiana nie wpływa na istniejące terminy.</p></div></div>
+{{ panel_tabs("cats") }}
+
+<form method="post" action="/panel/rodzaje" class="card card-pad form" style="margin-bottom:var(--space-6)">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="add">
+  <h2>Dodaj rodzaj sprawy</h2>
+  <div class="form-grid">
+    <div class="field"><label for="c_module">Moduł</label>
+      <select name="module" id="c_module">{% for k, m in MODULES.items() %}<option value="{{ k }}">{{ m.label }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="c_name">Nazwa</label><input type="text" name="name" id="c_name" required placeholder="np. Szkolenie z pierwszej pomocy"></div>
+    <div class="field full"><span class="label">Domyślny cykl (opcjonalnie)</span>
+      <div class="inline"><span class="small" style="flex:none">co</span><input type="number" name="interval_value" min="1" max="120" aria-label="Co ile" placeholder="—">
+        <select name="interval_unit" aria-label="Jednostka">{% for k, v in UNITS.items() %}<option value="{{ k }}" {{ 'selected' if k == 'months' }}>{{ v }}</option>{% endfor %}</select></div></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("plus") }}Dodaj</button></div>
+</form>
+
+{% for k, m in MODULES.items() %}
+{% set list = cats|selectattr("module", "equalto", k)|list %}
+<section class="section m-{{ k }}">
+  <div class="section-head"><h2 class="row"><span class="micon" style="width:32px;height:32px;border-radius:10px">{{ icon(m.icon) }}</span>{{ m.label }}</h2><span class="muted small">{{ list|length }}</span></div>
+  <div class="card table-wrap">
+    <table class="table resp">
+      <thead><tr><th>Nazwa</th><th>Domyślny cykl</th><th>Terminów</th><th></th></tr></thead>
+      <tbody>
+      {% for c in list %}
+      <tr>
+        <td><strong>{{ c.name }}</strong></td>
+        <td data-l="Cykl">
+          <form method="post" action="/panel/rodzaje" class="inline" style="max-width:320px">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="update"><input type="hidden" name="id" value="{{ c.id }}">
+            <input type="number" name="interval_value" min="1" max="120" value="{{ c.interval_value or '' }}" placeholder="brak" aria-label="Co ile">
+            <select name="interval_unit" aria-label="Jednostka">{% for uk, uv in UNITS.items() %}<option value="{{ uk }}" {{ 'selected' if (c.interval_unit or 'months') == uk }}>{{ uv }}</option>{% endfor %}</select>
+            <button class="btn btn-sm" style="flex:none" type="submit">Zapisz</button>
+          </form>
+        </td>
+        <td data-l="Terminów">{{ c.used }}</td>
+        <td>
+          <form method="post" action="/panel/rodzaje" data-confirm="Usunąć rodzaj „{{ c.name }}” z listy? {% if c.used %}Istniejące terminy ({{ c.used }}) pozostaną bez zmian.{% endif %}" data-confirm-title="Usuń rodzaj sprawy">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{ c.id }}">
+            <button class="btn btn-sm btn-ghost btn-icon" type="submit" aria-label="Usuń {{ c.name }}">{{ icon("trash") }}</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="muted">Brak rodzajów spraw.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

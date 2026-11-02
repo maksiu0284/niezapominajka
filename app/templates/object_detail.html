@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, term_row, initials, file_list, confirm_delete with context %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{% set P = perms[module] %}
+{% set here = "/m/%s/%s"|format(module, obj.id) %}
+<div class="crumbs">{% if P.view %}<a href="/m/{{ module }}">{{ meta.label }}</a><span>/</span>{% endif %}<span>{{ meta.single }}</span></div>
+
+<div class="page-head m-{{ module }}">
+  <div class="hero">
+    <div class="ph">{% if obj.photo_path %}<img src="/zdjecie/{{ module }}/{{ obj.id }}" alt="Zdjęcie: {{ title }}" data-zoom>{% elif module == "employees" %}{{ initials(title) }}{% else %}{{ icon(meta.icon) }}{% endif %}</div>
+    <div>
+      <h1>{{ title }}</h1>
+      <p class="sub">
+        {% if module == "employees" %}{{ obj.position or "Pracownik" }}{% elif module == "vehicles" %}{{ obj.brand_model or "Pojazd" }}{% else %}{{ obj.manufacturer or "Maszyna" }}{% if obj.location %} · {{ obj.location }}{% endif %}{% endif %}
+      </p>
+      <p class="row mt-2">
+        {% if open_terms %}<span class="pill">{{ open_terms|length }} otwartych terminów</span>{% endif %}
+        {% if own %}<span class="pill pill-owner">{{ icon("user") }}Twoja karta</span>{% endif %}
+      </p>
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if P.add %}<a class="btn btn-primary" href="/terminy/nowy?modul={{ module }}&obiekt={{ obj.id }}">{{ icon("plus") }}Dodaj termin</a>{% endif %}
+    {% if P.edit %}<a class="btn" href="{{ here }}/edycja">{{ icon("edit") }}Edytuj</a>{% endif %}
+    {% if P.delete %}{{ confirm_delete(here ~ "/usun", "Usuń: " ~ title, "Usunąć „" ~ title ~ "” razem ze wszystkimi terminami (" ~ (open_terms|length + done_terms|length) ~ ") i plikami? Tej operacji nie można cofnąć.") }}{% endif %}
+  </div>
+</div>
+
+<div class="layout-2">
+  <div>
+    <section>
+      <div class="section-head"><h2>Terminy</h2>
+        {% if P.add %}<a class="btn btn-sm" href="/terminy/nowy?modul={{ module }}&obiekt={{ obj.id }}">{{ icon("plus") }}Dodaj</a>{% endif %}</div>
+      {% if open_terms %}
+      <div class="terms">{% for t in open_terms %}{{ term_row(t, perms, False) }}{% endfor %}</div>
+      {% else %}
+      <div class="card empty" style="padding:var(--space-6)"><p>Brak otwartych terminów.</p></div>
+      {% endif %}
+    </section>
+
+    {% if done_terms %}
+    <section class="section">
+      <div class="section-head"><h2>Historia wykonanych</h2><span class="muted small">{{ done_terms|length }}</span></div>
+      <div class="card table-wrap">
+        <table class="table resp">
+          <thead><tr><th>Sprawa</th><th>Termin</th><th>Wykonano</th><th>Uwagi</th></tr></thead>
+          <tbody>
+          {% for t in done_terms %}
+          <tr><td data-l="Sprawa"><a href="/terminy/{{ t.id }}">{{ t.display_title }}</a></td><td data-l="Termin">{{ t.due_date|d }}</td>
+              <td data-l="Wykonano">{{ t.done_date|d }}</td><td data-l="Uwagi">{{ t.done_note or "" }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="stack">
+    <div class="card card-pad">
+      <h2 style="margin-bottom:var(--space-4)">Dane</h2>
+      <dl class="kv">
+        {% for f in meta.fields if f.type != "textarea" %}
+        <dt>{{ f.label }}</dt>
+        <dd>{% set v = obj.get(f.name) %}
+          {% if f.type == "employee" %}{% if responsible %}<a href="/m/employees/{{ responsible.id }}">{{ responsible.first_name }} {{ responsible.last_name }}</a>{% if responsible.phone %} · {{ responsible.phone }}{% endif %}{% else %}—{% endif %}
+          {% elif f.type == "select" %}{{ f.options.get(v or f.default, "—") }}
+          {% elif f.type == "date" %}{{ v|d if v else "—" }}
+          {% elif f.type == "tel" and v %}<a href="tel:{{ v|replace(' ', '') }}">{{ v }}</a>
+          {% elif f.type == "email" and v %}<a href="mailto:{{ v }}">{{ v }}</a>
+          {% else %}{{ v if v not in (none, "") else "—" }}{% endif %}</dd>
+        {% endfor %}
+        {% for cf in custom %}
+        <dt>{{ cf.name }}</dt><dd>{% set cv = cvalues.get(cf.id) %}{% if cv %}{{ cv|d if cf.field_type == "date" else cv }}{% else %}—{% endif %}</dd>
+        {% endfor %}
+      </dl>
+      {% if obj.notes %}<hr class="divider"><p class="small" style="white-space:pre-line">{{ obj.notes }}</p>{% endif %}
+    </div>
+
+    {% if module == "employees" and (extra.vehicles or extra.machines or extra.account) %}
+    <div class="card card-pad stack">
+      <h2>Powiązania</h2>
+      {% if extra.account %}<p class="small">{{ icon("key") }} Konto w programie: <strong>{{ extra.account.username }}</strong></p>{% endif %}
+      {% for v in extra.vehicles %}<p class="small m-vehicles">{{ icon("truck") }} {% if perms.vehicles.view %}<a href="/m/vehicles/{{ v.id }}">{{ v.name }} ({{ v.registration }})</a>{% else %}{{ v.name }} ({{ v.registration }}){% endif %}</p>{% endfor %}
+      {% for mch in extra.machines %}<p class="small">{{ icon("cog") }} {% if perms.machines.view %}<a href="/m/machines/{{ mch.id }}">{{ mch.name }}</a>{% else %}{{ mch.name }}{% endif %}</p>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card card-pad stack">
+      <h2>{{ icon("clip") }} Pliki</h2>
+      {{ file_list(attachments, P.delete, here) }}
+      {% if P.edit %}
+      <form method="post" action="/zalaczniki" enctype="multipart/form-data" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="module" value="{{ module }}">
+        <input type="hidden" name="object_id" value="{{ obj.id }}"><input type="hidden" name="back" value="{{ here }}">
+        <input type="file" name="files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ods,.odt,.odp,.ppt,.pptx,.txt,.rtf,.csv,image/*">
+        <button class="btn btn-sm" type="submit">{{ icon("upload") }}Dodaj pliki</button>
+      </form>
+      {% endif %}
+    </div>
+  </aside>
+</div>
+{% endblock %}

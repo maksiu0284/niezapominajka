@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, term_row with context %}
+{% block title %}Pulpit{% endblock %}
+{% block content %}
+{% macro url(v=None, m=None, mi=None, qq=None) -%}
+{%- set mm = module if m is none else m -%}{%- set qv = q if qq is none else qq -%}
+/?widok={{ v if v is not none else view }}{% if mm %}&modul={{ mm }}{% endif %}{% if qv %}&q={{ qv|urlencode }}{% endif %}{% if (mine if mi is none else mi) %}&moje=1{% endif %}
+{%- endmacro %}
+{% set views = [("todo", "Do zrobienia"), ("all", "Wszystkie otwarte"), ("overdue", "Po terminie"), ("urgent", "Pilne"), ("soon", "Wkrótce"), ("done", "Wykonane")] %}
+<div class="page-head">
+  <div>
+    <h1>{{ "Moje terminy" if mine else "Przypomnienia" }}</h1>
+    <p class="sub">Dziś {{ today|d }} · przypominam {{ settings.remind_days }} dni przed terminem, pilne: {{ settings.urgent_days }} dni</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn" href="/eksport/terminy.xlsx?widok={{ view }}{% if module %}&modul={{ module }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if mine %}&moje=1{% endif %}">{{ icon("download") }}Excel</a>
+    <a class="btn" title="Plik .ics do kalendarza w telefonie lub Outlooku" href="/eksport/kalendarz.ics?widok={{ view }}{% if module %}&modul={{ module }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if mine %}&moje=1{% endif %}">{{ icon("calendar") }}Kalendarz</a>
+    <a class="btn" href="/eksport/terminy.csv?widok={{ view }}{% if module %}&modul={{ module }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if mine %}&moje=1{% endif %}">{{ icon("download") }}CSV</a>
+    <button class="btn" type="button" onclick="window.print()">{{ icon("printer") }}Drukuj</button>
+  </div>
+</div>
+
+{% if no_code %}
+<div class="notice">{{ icon("alert") }}<span class="grow">Twoje konto właściciela nie ma kodu odzyskiwania. Wygeneruj go w profilu.</span><a class="btn btn-sm" href="/profil">Przejdź do profilu</a></div>
+{% endif %}
+
+<div class="stats">
+  <a class="stat stat-overdue {{ 'active' if view == 'overdue' }}" href="{{ url('overdue') }}"><span class="n">{{ counts.overdue }}</span><span class="l">Po terminie</span></a>
+  <a class="stat stat-urgent {{ 'active' if view == 'urgent' }}" href="{{ url('urgent') }}"><span class="n">{{ counts.urgent }}</span><span class="l">Pilne (≤ {{ settings.urgent_days }} dni)</span></a>
+  <a class="stat stat-soon {{ 'active' if view == 'soon' }}" href="{{ url('soon') }}"><span class="n">{{ counts.soon }}</span><span class="l">Wkrótce (≤ {{ settings.remind_days }} dni)</span></a>
+</div>
+
+<form class="toolbar" method="get" action="/" role="search">
+  <input type="hidden" name="widok" value="{{ view }}">
+  {% if module %}<input type="hidden" name="modul" value="{{ module }}">{% endif %}
+  {% if mine %}<input type="hidden" name="moje" value="1">{% endif %}
+  <label class="search"><span class="sr-only">Szukaj</span>{{ icon("search") }}<input type="search" name="q" value="{{ q }}" placeholder="Szukaj: osoba, pojazd, sprawa, kontrahent…"></label>
+  <button class="btn" type="submit">Szukaj</button>
+  {% if q %}<a class="btn btn-ghost" href="{{ url(None, None, None, '') }}">{{ icon("x") }}Wyczyść</a>{% endif %}
+</form>
+
+<div class="chips" aria-label="Widok">
+  {% for key, label in views %}<a class="chip {{ 'active' if view == key }}" href="{{ url(key) }}">{{ label }}</a>{% endfor %}
+</div>
+<div class="chips mt-2" aria-label="Moduł">
+  <a class="chip {{ 'active' if not module }}" href="{{ url(None, '') }}">Wszystkie moduły</a>
+  {% for m in visible_modules %}<a class="chip m-{{ m }} {{ 'active' if module == m }}" href="{{ url(None, m) }}"><span class="mdot"></span>{{ MODULES[m].label }}</a>{% endfor %}
+  {% if user.employee_id %}<a class="chip {{ 'active' if mine }}" href="{{ url(None, None, not mine) }}">{{ icon("user") }}Tylko moje{% if mine_count %} ({{ mine_count }}){% endif %}</a>{% endif %}
+</div>
+
+<div class="section" style="margin-top:var(--space-5)">
+  {% if terms %}
+  <p class="small muted" style="margin-bottom:var(--space-3)">Znaleziono: {{ terms|length }}</p>
+  <div class="terms">{% for t in terms %}{{ term_row(t, perms) }}{% endfor %}</div>
+  {% else %}
+  <div class="card empty">
+    {{ icon("check" if view == "todo" else "search") }}
+    <h3>{% if view == "todo" and not q %}Nic pilnego{% else %}Brak terminów{% endif %}</h3>
+    <p>{% if view == "todo" and not q %}W najbliższych {{ settings.remind_days }} dniach nie ma terminów do załatwienia.{% else %}Zmień filtr lub wyszukiwaną frazę.{% endif %}</p>
+    {% if perms.values()|selectattr("add")|list %}<a class="btn btn-primary" href="/terminy/nowy">{{ icon("plus") }}Dodaj termin</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

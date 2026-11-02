@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, password_field, errors_box with context %}
+{% block title %}Mój profil{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Mój profil</h1><p class="sub">Login: <strong>{{ user.username }}</strong> · {{ "Właściciel" if is_owner else "Użytkownik" }}{% if user.is_primary %} (główny){% endif %}</p></div></div>
+{{ errors_box(errors) }}
+{% if new_code %}
+<div class="card card-pad stack" style="margin-bottom:var(--space-5)">
+  <h2>Nowy kod odzyskiwania</h2>
+  <p class="small">Poprzedni kod przestał działać. Zapisz nowy kod teraz – później nie będzie widoczny.</p>
+  <div class="code-box" id="code">{{ new_code }}</div>
+  <div class="row"><a class="btn" href="/kod-odzyskiwania.txt">{{ icon("download") }}Pobierz plik</a>
+    <button class="btn" type="button" onclick="window.print()">{{ icon("printer") }}Drukuj</button>
+    <button class="btn" type="button" data-copy="code">{{ icon("file") }}Kopiuj</button></div>
+</div>
+{% endif %}
+<div class="grid grid-2" style="align-items:start">
+  <form method="post" action="/profil/dane" class="card card-pad form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>Dane kontaktowe</h2>
+    <div class="field"><label for="full_name">Imię i nazwisko</label><input type="text" name="full_name" id="full_name" value="{{ user.full_name or '' }}"></div>
+    <div class="field"><label for="email">E-mail</label><input type="email" name="email" id="email" value="{{ user.email or '' }}"></div>
+    <div class="field"><label for="phone">Telefon</label><input type="tel" name="phone" id="phone" value="{{ user.phone or '' }}"></div>
+    <div class="field"><label for="notify_channel">Codzienne zestawienie terminów</label>
+      <select name="notify_channel" id="notify_channel">{% for k, v in USER_CHANNELS.items() %}<option value="{{ k }}" {{ 'selected' if (user.notify_channel or 'none') == k }}>{{ v }}</option>{% endfor %}</select>
+      <span class="hint">Program wyśle rano listę pilnych spraw, jeśli właściciel włączył powiadomienia automatyczne.</span></div>
+    {% if employee %}<p class="small muted">Konto jest powiązane z pracownikiem: <a href="/m/employees/{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</a>. Widzisz swoje terminy w zakładce „Moje terminy”.</p>{% endif %}
+    <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("check") }}Zapisz</button></div>
+  </form>
+
+  <div class="stack">
+    <form method="post" action="/profil/haslo" class="card card-pad form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <h2>Zmiana hasła</h2>
+      <div class="field"><label for="current">Obecne hasło</label><input type="password" name="current" id="current" autocomplete="current-password" required></div>
+      <input type="hidden" id="uname" value="{{ user.username }}">
+      {{ password_field("password", "Nowe hasło", "password", "uname") }}
+      <div class="field"><label for="password2">Powtórz nowe hasło</label><input type="password" name="password2" id="password2" autocomplete="new-password" required></div>
+      <p class="xs muted">Po zmianie hasła inne zalogowane urządzenia zostaną wylogowane.</p>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("key") }}Zmień hasło</button></div>
+    </form>
+
+    <div class="card card-pad stack">
+      <h2>{{ icon("shield") }} Logowanie dwuetapowe</h2>
+      {% if settings.twofa_enabled != "1" %}<p class="small muted">Wyłączone w programie przez właściciela.</p>
+      {% elif user.totp_enabled %}<p class="small"><span class="pill pill-owner">włączone</span> Przy logowaniu program prosi o kod z aplikacji w telefonie.</p>
+      {% else %}<p class="small"><span class="pill">wyłączone</span> Zwiększ bezpieczeństwo konta kodem z telefonu.</p>{% endif %}
+      {% if settings.twofa_enabled == "1" %}<div><a class="btn" href="/profil/2fa">{{ icon("key") }}{{ "Zarządzaj" if user.totp_enabled else "Włącz" }}</a></div>{% endif %}
+    </div>
+
+    <div class="card card-pad stack" id="kalendarz">
+      <h2>{{ icon("calendar") }} Kalendarz w telefonie</h2>
+      {% if user.calendar_token %}
+      {% set cal_url = public_base() ~ "/kalendarz/" ~ user.calendar_token ~ ".ics" %}
+      <p class="small">Dodaj ten adres w kalendarzu jako subskrypcję – terminy będą się aktualizować same. Nie udostępniaj go innym.</p>
+      <div class="code-box small-code" id="cal-url">{{ cal_url }}</div>
+      <div class="row">
+        <button class="btn btn-sm" type="button" data-copy="cal-url">{{ icon("copy") }}Kopiuj adres</button>
+        <a class="btn btn-sm" href="{{ cal_url.replace('https://', 'webcal://').replace('http://', 'webcal://') }}">{{ icon("phone") }}Otwórz w kalendarzu</a>
+        <form method="post" action="/profil/kalendarz" data-confirm="Utworzyć nowy adres? Stary przestanie działać we wszystkich kalendarzach." data-confirm-title="Nowy adres" data-confirm-ok="Utwórz"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-ghost" type="submit">{{ icon("repeat") }}Nowy adres</button></form>
+        <form method="post" action="/profil/kalendarz/usun"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-ghost" type="submit">{{ icon("x") }}Wyłącz</button></form>
+      </div>
+      {% if not settings.public_url %}<p class="xs muted">Adres działa w sieci firmowej. Poza firmą – po skonfigurowaniu dostępu zdalnego.</p>{% endif %}
+      {% else %}
+      <p class="small">Utwórz prywatny adres, aby widzieć swoje terminy w Google Kalendarzu, kalendarzu iPhone'a lub Outlooku.</p>
+      <form method="post" action="/profil/kalendarz"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("calendar") }}Utwórz adres kalendarza</button></form>
+      {% endif %}
+    </div>
+
+    {% if is_owner %}
+    <form method="post" action="/profil/kod" class="card card-pad form" data-confirm="Wygenerować nowy kod odzyskiwania? Dotychczasowy kod przestanie działać." data-confirm-title="Nowy kod odzyskiwania" data-confirm-ok="Generuj">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <h2>Kod odzyskiwania</h2>
+      <p class="small muted">{% if user.recovery_created_at %}Aktualny kod wygenerowano {{ user.recovery_created_at[:10]|d }}.{% else %}Brak kodu odzyskiwania.{% endif %} Wygeneruj nowy, jeśli poprzedni zgubiłeś.</p>
+      <div class="field"><label for="current2">Obecne hasło</label><input type="password" name="current" id="current2" autocomplete="current-password" required></div>
+      <div class="form-actions"><button class="btn" type="submit">{{ icon("repeat") }}Wygeneruj nowy kod</button></div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

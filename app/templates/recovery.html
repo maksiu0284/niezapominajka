@@ -1,0 +1,34 @@
+{% extends "auth_base.html" %}
+{% from "macros.html" import icon, password_field with context %}
+{% block title %}Odzyskiwanie konta{% endblock %}
+{% block content %}
+{% if new_code %}
+<div class="stack">
+  <h1>Hasło zostało zmienione</h1>
+  <p>Stary kod odzyskiwania przestał działać. Oto nowy kod – zapisz go teraz, później nie będzie już widoczny.</p>
+  <div class="code-box" id="code">{{ new_code }}</div>
+  <div class="row">
+    <a class="btn" href="/kod-odzyskiwania.txt">{{ icon("download") }}Pobierz plik</a>
+    <button class="btn" type="button" onclick="window.print()">{{ icon("printer") }}Drukuj</button>
+    <button class="btn" type="button" data-copy="code">{{ icon("file") }}Kopiuj</button>
+  </div>
+  <a class="btn btn-primary" href="/logowanie">Przejdź do logowania</a>
+</div>
+{% else %}
+<form method="post" action="/odzyskiwanie" class="form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div><h1>Odzyskiwanie konta właściciela</h1>
+  <p class="muted small mt-2">Podaj login właściciela i kod odzyskiwania zapisany przy wdrożeniu, a następnie ustaw nowe hasło.</p></div>
+  {% if error %}<div class="errors" role="alert">{{ error }}</div>{% endif %}
+  <div class="field"><label for="username">Login właściciela</label>
+    <input type="text" name="username" id="username" value="{{ username or '' }}" autocapitalize="none" required></div>
+  <div class="field"><label for="code">Kod odzyskiwania</label>
+    <input type="text" name="code" id="code" placeholder="XXXXX-XXXXX-XXXXX-XXXXX" autocapitalize="characters" autocomplete="off" spellcheck="false" required></div>
+  {{ password_field("password", "Nowe hasło", "password", "username") }}
+  <div class="field"><label for="password2">Powtórz nowe hasło</label>
+    <input type="password" name="password2" id="password2" autocomplete="new-password" required></div>
+  <div class="form-actions"><a class="btn" href="/logowanie">{{ icon("back") }}Wróć</a><span class="spacer"></span>
+    <button class="btn btn-primary" type="submit">{{ icon("key") }}Ustaw nowe hasło</button></div>
+</form>
+{% endif %}
+{% endblock %}
