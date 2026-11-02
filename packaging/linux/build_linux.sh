@@ -10,6 +10,7 @@ PBS_URL="${PBS_URL:-https://github.com/astral-sh/python-build-standalone/release
 AIT_URL="${AIT_URL:-https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage}"
 WORK="$ROOT/build/linux"
 mkdir -p "$WORK" "$OUT"
+OUT="$(cd "$OUT" && pwd)"   # pełna ścieżka – skrypt dalej zmienia katalog
 cd "$WORK"
 [ -f pbs.tgz ] || curl -fL -o pbs.tgz "$PBS_URL"
 [ -f appimagetool ] || { curl -fL -o appimagetool "$AIT_URL"; chmod +x appimagetool; }
