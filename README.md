@@ -318,11 +318,8 @@ Dopisz też zmiany do `CHANGELOG.md`.
 
 ### Wsparcie przez GitHub Sponsors
 
-Plik `.github/FUNDING.yml` dodaje na stronie repozytorium przycisk „Sponsor”. Program w karcie „O programie” prowadzi do https://github.com/sponsors/maksiu0284. Link zacznie działać po włączeniu profilu Sponsors:
-
-1. Wejdź na https://github.com/sponsors i wybierz „Get started” przy swoim koncie osobistym.
-2. Uzupełnij profil, progi wsparcia i dane rozliczeniowe (Stripe).
-3. Poczekaj na akceptację przez GitHub.
+Program jest darmowy. Jeśli Ci pomaga, możesz dobrowolnie wesprzeć jego rozwój przez
+[GitHub Sponsors](https://github.com/sponsors/maksiu0284). Błędy i propozycje zgłaszaj w zakładce Issues.
 
 ## Licencja
 
