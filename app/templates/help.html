@@ -68,8 +68,13 @@
     <li><strong>Właściciel</strong> widzi i zmienia wszystko, ma panel i dziennik zdarzeń. Właścicieli może być kilku; głównego nie można usunąć.</li>
     <li><strong>Użytkownik</strong> ma uprawnienia w każdym module: podgląd, dodawanie, edycja, usuwanie, powiadamianie. Konto powiązane z pracownikiem widzi jego terminy w „Moje terminy”.</li>
     <li>Zapomniane hasło: właściciel nadaje hasło tymczasowe. Główny właściciel może użyć kodu odzyskiwania.</li>
-    <li>Po 5 błędnych próbach logowania konto blokuje się na 15 minut.</li>
-    <li><strong>Logowanie dwuetapowe</strong> włącza właściciel w Ustawieniach. Wtedy jest obowiązkowe dla właścicieli, a użytkownicy mogą je włączyć w profilu. Zgubiony telefon: inny właściciel wyłącza je w karcie konta, a główny właściciel może użyć kodu odzyskiwania.</li>
+    <li>Po 5 błędnych próbach logowania z jednego adresu program każe czekać coraz dłużej (1, 2, 4… sekund, najwyżej 15 minut). Konta nie są blokowane, więc nikt nie zablokuje innej osoby, wpisując złe hasła.</li>
+    <li>Wylogowanie działa od razu na serwerze. W <strong>Moim profilu</strong> możesz wylogować się na wszystkich urządzeniach, a właściciel może to zrobić dla dowolnego konta w panelu. Zmiana hasła wylogowuje pozostałe urządzenia. Sesja wygasa po 12 godzinach.</li>
+    <li>Login, e-mail, hasło i logowanie dwuetapowe <strong>głównego właściciela</strong> zmienia tylko on sam. Gdy zapomni hasła, korzysta z kodu odzyskiwania – przechowuj go bezpiecznie.</li>
+    <li>Załączniki: program sprawdza zawartość pliku, a nie tylko rozszerzenie. Plik, którego treść nie pasuje do rozszerzenia (np. strona HTML udająca zdjęcie), zostanie odrzucony. W przeglądarce otwierają się tylko zdjęcia i PDF, reszta jest pobierana.</li>
+    <li>W sieci lokalnej program działa przez zwykłe HTTP – hasła nie są szyfrowane w drodze. Spoza firmy łącz się tylko przez HTTPS (Tailscale, Cloudflare lub własny certyfikat).</li>
+    <li><strong>Wersja przenośna</strong> trzyma dane w folderze <code>dane</code> obok programu. Chronią je tylko uprawnienia tego folderu, dlatego umieść program w miejscu dostępnym wyłącznie dla Ciebie. Na wspólnym komputerze lepszy jest instalator.</li>
+    <li><strong>Logowanie dwuetapowe</strong> włącza właściciel w Ustawieniach. Wtedy jest obowiązkowe dla właścicieli, a użytkownicy mogą je włączyć w profilu. Zgubiony telefon: inny właściciel wyłącza je w karcie konta, a główny właściciel używa kodu odzyskiwania.</li>
   </ul>
 </section>
 

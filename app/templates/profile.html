@@ -10,7 +10,7 @@
   <p class="small">Poprzedni kod przestał działać. Zapisz nowy kod teraz – później nie będzie widoczny.</p>
   <div class="code-box" id="code">{{ new_code }}</div>
   <div class="row"><a class="btn" href="/kod-odzyskiwania.txt">{{ icon("download") }}Pobierz plik</a>
-    <button class="btn" type="button" onclick="window.print()">{{ icon("printer") }}Drukuj</button>
+    <button class="btn" type="button" data-action="print">{{ icon("printer") }}Drukuj</button>
     <button class="btn" type="button" data-copy="code">{{ icon("file") }}Kopiuj</button></div>
 </div>
 {% endif %}
@@ -39,6 +39,13 @@
       <p class="xs muted">Po zmianie hasła inne zalogowane urządzenia zostaną wylogowane.</p>
       <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon("key") }}Zmień hasło</button></div>
     </form>
+
+    <div class="card card-pad stack">
+      <h2>{{ icon("logout") }} Zalogowane urządzenia</h2>
+      <p class="small">Aktywnych sesji: <strong>{{ session_count or 1 }}</strong>. Jeśli logowałeś się na cudzym urządzeniu albo zgubiłeś telefon, wyloguj się wszędzie – także tutaj.</p>
+      <form method="post" action="/profil/wyloguj-wszedzie" data-confirm="Wylogować to konto na wszystkich urządzeniach, także na tym?" data-confirm-title="Wyloguj wszędzie" data-confirm-ok="Wyloguj">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("logout") }}Wyloguj wszędzie</button></form>
+    </div>
 
     <div class="card card-pad stack">
       <h2>{{ icon("shield") }} Logowanie dwuetapowe</h2>

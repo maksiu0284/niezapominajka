@@ -9,6 +9,12 @@
   <div class="card card-pad"><p class="muted small">Pracownicy / pojazdy / maszyny</p><p style="font-size:var(--text-xl);font-weight:700">{{ stats.employees }} / {{ stats.vehicles }} / {{ stats.machines }}</p></div>
   <div class="card card-pad"><p class="muted small">Otwarte terminy</p><p style="font-size:var(--text-xl);font-weight:700">{{ stats.terms }}</p></div>
 </div>
+{% if insecure %}
+<div class="notice notice-warn">{{ icon("alert") }}<span class="grow">Łączysz się z innego urządzenia przez zwykłe HTTP – hasła i ciasteczko sesji idą przez sieć bez szyfrowania. Używaj tylko zaufanej sieci albo ustaw HTTPS w <a href="/panel/dostep-zdalny">dostępie zdalnym</a> (Tailscale, Cloudflare lub własny certyfikat).</span></div>
+{% endif %}
+{% if portable %}
+<div class="notice">{{ icon("info") }}<span class="grow">Wersja przenośna: dane (baza, załączniki, kopie) są w folderze <code>{{ data_dir }}</code>. Chronią je tylko uprawnienia tego folderu – trzymaj program w miejscu, do którego nie mają dostępu inne osoby (nie na pulpicie wspólnym ani na pendrivie).</span></div>
+{% endif %}
 {% if not last_backup %}
 <div class="notice">{{ icon("alert") }}<span class="grow">Nie ma jeszcze żadnej kopii zapasowej.</span><a class="btn btn-sm" href="/panel/kopie">Utwórz kopię</a></div>
 {% endif %}

@@ -17,6 +17,25 @@
   scrim && scrim.addEventListener("click", () => drawer(false));
   document.addEventListener("keydown", e => { if (e.key === "Escape") drawer(false); });
 
+  /* ---------- Przyciski: drukuj / cofnij / odśwież (bez skryptów wbudowanych w HTML – CSP) ---------- */
+  $$("[data-action]").forEach(b => b.addEventListener("click", () => {
+    const a = b.dataset.action;
+    if (a === "print") window.print();
+    else if (a === "back") history.back();
+    else if (a === "reload") location.reload();
+  }));
+
+  /* ---------- Ostrzeżenia, które można ukryć na tym urządzeniu ---------- */
+  $$("[data-dismiss-key]").forEach(box => {
+    const key = "nz-hide-" + box.dataset.dismissKey;
+    try { if (localStorage.getItem(key) === "1") { box.hidden = true; return; } } catch (e) {}
+    const btn = box.querySelector("[data-dismiss]");
+    btn && btn.addEventListener("click", () => {
+      box.hidden = true;
+      try { localStorage.setItem(key, "1"); } catch (e) {}
+    });
+  });
+
   /* ---------- Potwierdzenia ---------- */
   const cdlg = $("#confirm-dialog");
   $$("form[data-confirm]").forEach(form => {

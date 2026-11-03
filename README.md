@@ -20,10 +20,10 @@ Gotowe pliki są na stronie [Releases](https://github.com/maksiu0284/niezapomina
 
 | Plik | Dla kogo |
 |---|---|
-| `Niezapominajka-1.0.1-instalator.exe` | Windows 10/11, zalecany. Dodaje skrót, autostart i regułę zapory |
-| `Niezapominajka-1.0.1-przenosna.exe` | Windows bez instalacji, np. do testów albo na pendrive |
-| `Niezapominajka-1.0.1-x86_64.AppImage` | Linux z pulpitem (Ubuntu, Debian, Mint, Fedora) |
-| `niezapominajka-1.0.1-linux-serwer.tar.gz` | Linux bez pulpitu: serwer z usługą systemd |
+| `Niezapominajka-1.0.2-instalator.exe` | Windows 10/11, zalecany. Dodaje skrót, autostart i regułę zapory |
+| `Niezapominajka-1.0.2-przenosna.exe` | Windows bez instalacji, np. do testów albo na pendrive |
+| `Niezapominajka-1.0.2-x86_64.AppImage` | Linux z pulpitem (Ubuntu, Debian, Mint, Fedora) |
+| `niezapominajka-1.0.2-linux-serwer.tar.gz` | Linux bez pulpitu: serwer z usługą systemd |
 | kod źródłowy | dowolny system z Pythonem 3.10 lub nowszym |
 
 Pliki exe nie mają podpisu cyfrowego. Przy pierwszym uruchomieniu Windows SmartScreen może pokazać ostrzeżenie „System Windows ochronił ten komputer”. Kliknij wtedy „Więcej informacji”, a potem „Uruchom mimo to”.
@@ -32,7 +32,7 @@ Pliki exe nie mają podpisu cyfrowego. Przy pierwszym uruchomieniu Windows Smart
 
 ### Windows – instalator
 
-1. Uruchom `Niezapominajka-1.0.1-instalator.exe`. Instalator wymaga uprawnień administratora.
+1. Uruchom `Niezapominajka-1.0.2-instalator.exe`. Instalator wymaga uprawnień administratora.
 2. Zaznacz opcje:
    - skrót na pulpicie;
    - uruchamianie po zalogowaniu (zalecane na komputerze-serwerze);
@@ -48,13 +48,13 @@ Program instaluje się w `C:\Program Files\Niezapominajka`, a dane trzyma w `C:\
 
 ### Windows – wersja przenośna
 
-Skopiuj `Niezapominajka-1.0.1-przenosna.exe` do wybranego folderu, np. `C:\Niezapominajka`, i uruchom. Dane powstaną w podfolderze `dane` obok pliku. Jeśli telefony mają się łączyć, dodaj ręcznie regułę zapory (zob. „Zapora sieciowa”).
+Skopiuj `Niezapominajka-1.0.2-przenosna.exe` do wybranego folderu, np. `C:\Niezapominajka`, i uruchom. Dane powstaną w podfolderze `dane` obok pliku. Jeśli telefony mają się łączyć, dodaj ręcznie regułę zapory (zob. „Zapora sieciowa”).
 
 ### Linux – AppImage
 
 ```bash
-chmod +x Niezapominajka-1.0.1-x86_64.AppImage
-./Niezapominajka-1.0.1-x86_64.AppImage
+chmod +x Niezapominajka-1.0.2-x86_64.AppImage
+./Niezapominajka-1.0.2-x86_64.AppImage
 ```
 
 Otworzy się małe okno z adresem programu i przyciskami, a w przeglądarce otworzy się Niezapominajka. Zamknięcie okna zatrzymuje program. Dane są w `~/.local/share/niezapominajka`.
@@ -62,7 +62,7 @@ Otworzy się małe okno z adresem programu i przyciskami, a w przeglądarce otwo
 Jeśli system zgłasza brak FUSE, zainstaluj `libfuse2` (Ubuntu 22.04: `sudo apt install libfuse2`; Ubuntu 24.04 i nowsze: `sudo apt install libfuse2t64`). Możesz też uruchomić program bez FUSE:
 
 ```bash
-./Niezapominajka-1.0.1-x86_64.AppImage --appimage-extract-and-run
+./Niezapominajka-1.0.2-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ### Linux – serwer (bez pulpitu)
@@ -70,8 +70,8 @@ Jeśli system zgłasza brak FUSE, zainstaluj `libfuse2` (Ubuntu 22.04: `sudo apt
 Paczka zawiera własnego Pythona, więc niczego nie trzeba doinstalowywać.
 
 ```bash
-tar -xzf niezapominajka-1.0.1-linux-serwer.tar.gz
-cd niezapominajka-1.0.1-linux-serwer
+tar -xzf niezapominajka-1.0.2-linux-serwer.tar.gz
+cd niezapominajka-1.0.2-linux-serwer
 sudo ./install.sh            # albo: sudo ./install.sh --port 8080
 ```
 
@@ -135,7 +135,11 @@ Program nie ma domyślnego konta ani hasła.
 
   Przegląda też dziennik zdarzeń: kto, kiedy i co zmienił, z wartością przed i po. Właścicieli może być kilku. Główny jest chroniony przed usunięciem.
 - **Użytkownik** ma uprawnienia osobno dla każdego modułu: podgląd, dodawanie, edycja, usuwanie i powiadamianie. Konto może być powiązane z pracownikiem. Użytkownik widzi wtedy swoje terminy i te, za które odpowiada.
-- Po 5 błędnych logowaniach konto jest blokowane na 15 minut. Hasło tymczasowe nadane przez właściciela trzeba zmienić przy logowaniu.
+- Po 5 błędnych logowaniach z jednego adresu program każe czekać coraz dłużej: 1, 2, 4… sekund, najwyżej 15 minut. Konta nie są blokowane. Hasło tymczasowe nadane przez właściciela trzeba zmienić przy logowaniu.
+- Sesje są przechowywane na serwerze i wygasają po 12 godzinach. Wylogowanie, zmiana hasła i reset 2FA działają od razu. W profilu jest „Wyloguj wszędzie”, a właściciel może wylogować dowolne konto w panelu.
+- Login, e-mail, hasło i 2FA głównego właściciela zmienia tylko on sam. Gdy zapomni hasła, używa kodu odzyskiwania. Kod nie włącza wyłączonego konta.
+- Załączniki są sprawdzane po zawartości, nie tylko po rozszerzeniu. Pliki HTML, SVG i skrypty są odrzucane. W przeglądarce otwierają się tylko zdjęcia i PDF.
+- W sieci lokalnej program działa przez HTTP i pokazuje o tym ostrzeżenie. Przez dostęp zdalny z HTTPS ciasteczko sesji ma flagę Secure.
 
 ## Powiadomienia
 
@@ -237,7 +241,6 @@ Program raz dziennie sprawdza na GitHubie, czy jest nowsza wersja, i pokazuje w�
 | `niezapominajka.db` | baza danych (SQLite) |
 | `zalaczniki/` | pliki i zdjęcia dodane do terminów (do 25 MB na plik) |
 | `kopie/` | kopie zapasowe ZIP (14 automatycznych + ręczne) |
-| `klucz_sesji.txt` | klucz sesji logowania, nie udostępniaj go |
 | `niezapominajka.log` | dziennik techniczny wersji okienkowej |
 
 Gdzie jest folder danych:
@@ -258,7 +261,7 @@ Program robi kopię raz na dobę. Właściciel może też zrobić i pobrać kopi
 
 1. Zatrzymaj program.
 2. Przenieś obecny folder danych w bezpieczne miejsce.
-3. Utwórz pusty folder danych i rozpakuj do niego ZIP. Pojawią się `niezapominajka.db` i `zalaczniki/`. Skopiuj też `klucz_sesji.txt` z poprzedniego folderu.
+3. Utwórz pusty folder danych i rozpakuj do niego ZIP. Pojawią się `niezapominajka.db` i `zalaczniki/`. Po przywróceniu wszyscy logują się ponownie.
 4. Uruchom program.
 
 ## Zapora sieciowa
@@ -289,7 +292,7 @@ Pliki z `.github/workflows/` wymagają tokenu z uprawnieniem `workflow`. Utwórz
 cd niezapominajka
 git init -b main
 git add .
-git commit -m "Niezapominajka 1.0.1"
+git commit -m "Niezapominajka 1.0.2"
 git remote add origin https://github.com/maksiu0284/niezapominajka.git
 git push -u origin main
 ```
@@ -299,8 +302,8 @@ Jeśli repozytorium na GitHubie ma już plik, np. README albo LICENSE, przed `gi
 ### Wydanie wersji
 
 ```bash
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
 GitHub Actions zbuduje wtedy instalator, wersję przenośną, AppImage i paczkę serwerową. Doda je do strony Releases razem z plikiem `SHA256SUMS.txt`. Przy kolejnej wersji zmień numer w trzech miejscach:

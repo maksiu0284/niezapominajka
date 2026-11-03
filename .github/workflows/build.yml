@@ -21,7 +21,7 @@ jobs:
       - name: Biblioteki
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyinstaller -r requirements-desktop.txt
+          python -m pip install pyinstaller==6.22.3 -r requirements-desktop.txt
       - name: Program (folder do instalatora)
         run: pyinstaller --noconfirm --clean --workpath build/win --distpath dist-win packaging/windows/niezapominajka.spec
       - name: Wersja przenośna (jeden plik)

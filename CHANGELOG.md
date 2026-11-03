@@ -1,5 +1,41 @@
 # Zmiany
 
+## 1.0.2 – 2026-11-03
+
+Wydanie z poprawkami bezpieczeństwa. Dane z 1.0.0 i 1.0.1 zostają – baza aktualizuje się sama przy pierwszym uruchomieniu. Po aktualizacji wszyscy muszą zalogować się jeszcze raz.
+
+### Załączniki
+
+- Typ pliku jest ustalany po zawartości (sygnatura), a nie po rozszerzeniu i typie podanym przez przeglądarkę. Plik, którego treść nie pasuje do rozszerzenia, jest odrzucany (np. strona HTML ze skryptem zapisana jako `zdjecie.png`).
+- Zablokowane rodzaje plików: HTML, SVG, XML, skrypty i programy.
+- W przeglądarce otwierają się tylko zdjęcia i PDF, reszta jest pobierana. Pobierane pliki mają nagłówki `X-Content-Type-Options: nosniff` i `Content-Security-Policy: sandbox`.
+- Załączniki dodane we wcześniejszych wersjach są sprawdzane przy starcie; podejrzane są od tej pory tylko pobierane, nigdy wyświetlane.
+
+### Logowanie i sesje
+
+- Sesje przechowywane na serwerze: wylogowanie, zmiana hasła i reset 2FA unieważniają sesję od razu. „Wyloguj wszędzie” w profilu, wylogowanie dowolnego konta przez właściciela w panelu.
+- Zamiast blokady konta: rosnące opóźnienie dla adresu, z którego przychodzą błędne hasła (od 6. próby 1, 2, 4… s, najwyżej 15 min). Nikt nie zablokuje cudzego konta.
+- Ten sam komunikat i czas odpowiedzi dla nieistniejącego loginu i złego hasła.
+- Ciasteczko z flagą Secure przy połączeniu HTTPS (także przez Tailscale, Cloudflare i własny proxy).
+- Kod odzyskiwania znika z sesji po wyświetleniu; plik z kodem można pobrać raz, w ciągu 10 minut.
+- Kod odzyskiwania nie włącza wyłączonego konta. Wyłączenie konta lub odebranie roli właściciela unieważnia jego kod.
+- Login, e-mail, hasło i 2FA głównego właściciela może zmienić tylko on sam.
+- Parametr powrotu (`back`) przyjmuje tylko adresy wewnątrz programu.
+- Ostrzeżenie o niezaszyfrowanym połączeniu HTTP na stronie logowania (można je ukryć na danym urządzeniu) i w panelu właściciela.
+
+### Pozostałe
+
+- Nagłówki bezpieczeństwa: Content-Security-Policy, X-Frame-Options, Referrer-Policy, nosniff. Skrypty wbudowane w strony przeniesione do plików.
+- Strony po zalogowaniu nie są zapisywane w pamięci podręcznej przeglądarki (`Cache-Control: no-store`).
+- Eksport do Excela i CSV: tekst zaczynający się od `=`, `+`, `-`, `@` nie jest traktowany jak formuła (także w dzienniku zdarzeń).
+- Okno powiadomienia: pełna lista kontaktów tylko dla osób z prawem podglądu pracowników; pozostali widzą osobę odpowiedzialną.
+- Ostrzeżenie przy adresie bramki SMS Android zaczynającym się od `http://`.
+- Instalator Windows: folder danych dostępny tylko dla Administratorów, SYSTEM i konta instalującego (dawniej modyfikować mogli wszyscy użytkownicy komputera). Dotyczy też istniejącego folderu.
+- Wersja przenośna: ostrzeżenie w Pomocy i w panelu o ochronie folderu `dane`.
+- Folder danych na Linuksie bez dostępu dla innych użytkowników.
+- Przypięte wersje bibliotek. Usunięta zależność itsdangerous i plik `klucz_sesji.txt`.
+- Poprawka: ikona lupy nie nachodzi na tekst w polu wyszukiwania.
+
 ## 1.0.1 – 2026-11-02
 
 - Poprawka: pasek boczny przewija się, gdy menu nie mieści się w oknie (niskie okno na komputerze, menu na telefonie). Pozycje „Mój profil” i „Wyloguj” są zawsze osiągalne.

@@ -265,13 +265,26 @@ def normalize_phone(phone):
 
 # ---------- EKSPORT ----------
 
+_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def csv_safe(v):
+    """Tekst zaczynający się od =, +, -, @, tab lub CR Excel potraktowałby jak formułę –
+    poprzedzamy go apostrofem. Liczby zostają liczbami."""
+    if v is None:
+        return ""
+    if isinstance(v, str) and v.startswith(_FORMULA_START):
+        return "'" + v
+    return v
+
+
 def to_csv(headers, rows):
     buf = io.StringIO()
     buf.write("\ufeff")  # BOM – poprawne polskie znaki w Excelu
     w = csv.writer(buf, delimiter=";")
-    w.writerow(headers)
+    w.writerow([csv_safe(h) for h in headers])
     for r in rows:
-        w.writerow(["" if v is None else v for v in r])
+        w.writerow([csv_safe(v) for v in r])
     return buf.getvalue().encode("utf-8")
 
 
@@ -289,6 +302,11 @@ def to_xlsx(title, headers, rows):
         cell.fill = PatternFill("solid", fgColor="2F4A55")
     for r in rows:
         ws.append(["" if v is None else v for v in r])
+    # Teksty zapisujemy zawsze jako tekst – nawet "=..." nie stanie się formułą.
+    for row in ws.iter_rows():
+        for cell in row:
+            if isinstance(cell.value, str) and cell.value.startswith(_FORMULA_START):
+                cell.data_type = "s"
     for i, h in enumerate(headers, 1):
         width = max([len(str(h))] + [len(str(r[i - 1] or "")) for r in rows[:500]]) + 2
         ws.column_dimensions[get_column_letter(i)].width = min(width, 60)

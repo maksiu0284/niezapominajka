@@ -16,7 +16,7 @@
     <a class="btn" href="/eksport/terminy.xlsx?widok={{ view }}{% if module %}&modul={{ module }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if mine %}&moje=1{% endif %}">{{ icon("download") }}Excel</a>
     <a class="btn" title="Plik .ics do kalendarza w telefonie lub Outlooku" href="/eksport/kalendarz.ics?widok={{ view }}{% if module %}&modul={{ module }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if mine %}&moje=1{% endif %}">{{ icon("calendar") }}Kalendarz</a>
     <a class="btn" href="/eksport/terminy.csv?widok={{ view }}{% if module %}&modul={{ module }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if mine %}&moje=1{% endif %}">{{ icon("download") }}CSV</a>
-    <button class="btn" type="button" onclick="window.print()">{{ icon("printer") }}Drukuj</button>
+    <button class="btn" type="button" data-action="print">{{ icon("printer") }}Drukuj</button>
   </div>
 </div>
 

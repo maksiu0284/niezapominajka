@@ -231,8 +231,9 @@ p { margin: 0; }
 .chip.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .chip .mdot { width: 8px; height: 8px; border-radius: 50%; }
 .search { position: relative; flex: 1; min-width: 200px; max-width: 380px; }
-.search .icon { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--muted); }
-.search input { padding-left: 2.4rem; }
+.search .icon { position: absolute; left: .8rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; z-index: 1; }
+/* Większa szczegółowość niż ogólna reguła input[type=search] niżej – inaczej lupa nachodzi na tekst. */
+.search input, .search input[type=search] { padding-left: 2.4rem; }
 @media (max-width: 600px) { .search { max-width: none; min-width: 100%; } }
 
 /* ---------- Kolory modułów ---------- */
@@ -511,6 +512,7 @@ details summary { cursor: pointer; color: var(--primary); font-size: var(--text-
 .content > .notice { margin-bottom: var(--space-4); }
 details > summary { cursor: pointer; color: var(--ink-2); }
 fieldset [hidden], .form-grid[hidden] { display: none; }
+.notice[hidden] { display: none; }
 
 /* ---------- Tryb ciemny ---------- */
 :root[data-theme="dark"] {

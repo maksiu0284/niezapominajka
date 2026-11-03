@@ -5,7 +5,6 @@ Copyright (C) 2026 Maksymilian Staszewski <maksymilianstaszewski@gmail.com>
 Licencja: GNU AGPL-3.0 – https://github.com/maksiu0284/niezapominajka
 """
 import json
-import mimetypes
 import secrets
 import threading
 import time
@@ -20,22 +19,12 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import UploadFile
-from starlette.middleware.sessions import SessionMiddleware
 
-from . import config, db, notify, security, services as svc, totp
+from . import config, db, files, notify, security, services as svc, sessions, totp
 
 # ======================================================================
 #  START APLIKACJI
 # ======================================================================
-
-
-def _secret_key():
-    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if config.SECRET_FILE.exists():
-        return config.SECRET_FILE.read_text().strip()
-    key = secrets.token_urlsafe(48)
-    config.SECRET_FILE.write_text(key)
-    return key
 
 
 def _worker():
@@ -44,6 +33,8 @@ def _worker():
     while True:
         try:
             s = db.get_settings()
+            if tick % 30 == 0:
+                sessions.purge_expired()
             if s.get("setup_done") == "1":
                 if tick % 60 == 0:
                     age = svc.last_auto_backup_age_hours()
@@ -66,20 +57,57 @@ def _worker():
 @asynccontextmanager
 async def lifespan(app):
     db.init()
+    security.burn_password_check("")  # przygotowuje hash porównawczy – pierwsze logowanie nie zdradza czasu
     threading.Thread(target=_worker, daemon=True).start()
     yield
 
 
 db.init()
 app = FastAPI(title=config.APP_NAME, lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=_secret_key(),
-    session_cookie="niezapominajka_sesja",
-    https_only=bool(db.get_settings().get("https_cert")),
-    max_age=config.SESSION_HOURS * 3600,
-    same_site="lax",
-)
+
+# Polityka treści stron programu: skrypty i style tylko z programu, bez osadzania w obcych ramkach.
+PAGE_CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+            "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
+            "frame-ancestors 'none'; manifest-src 'self'; worker-src 'self'")
+
+
+class SecurityHeadersMiddleware:
+    """Nagłówki bezpieczeństwa dla każdej odpowiedzi; strony po zalogowaniu nie trafiają do pamięci podręcznej."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        static = path.startswith("/static/") or path in ("/sw.js", "/manifest.webmanifest", "/offline")
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                hdrs = list(message.get("headers") or [])
+                present = {k.lower() for k, _ in hdrs}
+                add = {
+                    b"x-content-type-options": b"nosniff",
+                    b"x-frame-options": b"DENY",
+                    b"referrer-policy": b"same-origin",
+                    b"content-security-policy": PAGE_CSP.encode(),
+                    b"permissions-policy": b"camera=(), microphone=(), geolocation=()",
+                }
+                if not static:
+                    add[b"cache-control"] = b"no-store"
+                for k, v in add.items():
+                    if k not in present:
+                        hdrs.append((k, v))
+                message["headers"] = hdrs
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
+app.add_middleware(sessions.ServerSessionMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.mount("/static", StaticFiles(directory=config.BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=config.BASE_DIR / "templates")
 templates.env.filters["d"] = svc.fmt_date
@@ -124,6 +152,21 @@ async def _http_error(request, exc):
 
 def client_ip(request):
     return request.client.host if request.client else None
+
+
+def safe_back(value, default="/"):
+    """Adres powrotu tylko w obrębie programu (ścieżka od „/”, bez „//” i bez znaków sterujących)."""
+    v = str(value or "").strip()
+    if (not v.startswith("/") or v.startswith("//") or v.startswith("/\\")
+            or any(ch in v for ch in ("\\", "\r", "\n", "\t")) or len(v) > 500):
+        return default
+    return v
+
+
+def insecure_connection(request):
+    """Połączenie bez szyfrowania z innego urządzenia niż ten komputer."""
+    host = client_ip(request) or ""
+    return not sessions.is_https(request.scope) and host not in ("127.0.0.1", "::1", "localhost")
 
 
 def flash(request, message, kind="ok"):
@@ -202,6 +245,8 @@ async def form_data(request):
 
 
 def render(request, name, c=None, status=200, **kw):
+    if not kw.pop("keep_code", False):
+        request.session.pop("show_code", None)  # kod odzyskiwania znika z sesji po opuszczeniu strony z kodem
     flashes = request.session.pop("flash", [])
     context = {
         "user": c.user if c else None,
@@ -253,16 +298,17 @@ async def store_upload(upload: UploadFile, images_only=False):
     """Zapisuje plik; zwraca (stored_name, size, mime) albo rzuca ValueError."""
     ext = _ext(upload.filename)
     allowed = config.IMAGE_EXTENSIONS if images_only else config.ALLOWED_EXTENSIONS
-    if ext not in allowed:
+    if ext not in allowed or ext in files.BLOCKED_EXTENSIONS:
         raise ValueError(f"Niedozwolony typ pliku: {upload.filename}")
     data = await upload.read()
     if len(data) > config.MAX_UPLOAD_MB * 1024 * 1024:
         raise ValueError(f"Plik {upload.filename} jest większy niż {config.MAX_UPLOAD_MB} MB")
     if not data:
         raise ValueError(f"Plik {upload.filename} jest pusty")
+    # Typ ustala serwer po zawartości; typ podany przez przeglądarkę (upload.content_type) jest ignorowany.
+    mime = files.check_upload(upload.filename, data, allowed)
     stored = secrets.token_hex(16) + ext
     (config.UPLOAD_DIR / stored).write_bytes(data)
-    mime = upload.content_type or mimetypes.guess_type(upload.filename)[0] or "application/octet-stream"
     return stored, len(data), mime
 
 
@@ -303,7 +349,7 @@ def attachments_for(module, object_id=None, term_id=None):
             (module, object_id),
         )
     for r in rows:
-        r["is_image"] = _ext(r["original_name"]) in config.IMAGE_EXTENSIONS
+        r["is_image"] = _ext(r["original_name"]) in config.IMAGE_EXTENSIONS and (r["mime"] or "").startswith("image/")
     return rows
 
 
@@ -486,28 +532,24 @@ def _start_session(request, user):
     request.session["uid"] = user["id"]
     request.session["sv"] = user["session_version"]
     request.session["login_ts"] = time.time()
+    sessions.rotate(request)
+    security.throttle_reset(client_ip(request))
     db.execute("UPDATE users SET last_login=?, failed_attempts=0, locked_until=NULL WHERE id=?",
                (db.now_str(), user["id"]))
 
 
 def _locked(user):
-    if user and user.get("locked_until"):
-        until = datetime.strptime(user["locked_until"], "%Y-%m-%d %H:%M:%S")
-        if until > datetime.now():
-            return until
+    """Od wersji 1.0.2 konta nie są blokowane (ograniczenie działa wg adresu IP)."""
     return None
 
 
 def _register_fail(user, request, reason):
-    if user:
-        fails = user["failed_attempts"] + 1
-        locked = None
-        if fails >= config.LOGIN_MAX_FAILS:
-            locked = (datetime.now() + timedelta(minutes=config.LOGIN_LOCK_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
-            fails = 0
-        db.execute("UPDATE users SET failed_attempts=?, locked_until=COALESCE(?, locked_until) WHERE id=?",
-                   (fails, locked, user["id"]))
+    security.throttle_fail(client_ip(request))
     security.audit(user, "login_failed", None, "konto", user["id"] if user else None, reason, ip=client_ip(request))
+
+
+def _throttled(request):
+    return security.throttle_wait(client_ip(request))
 
 
 @app.get("/logowanie", response_class=HTMLResponse)
@@ -516,7 +558,7 @@ def login_get(request: Request, next: str = "/"):
         return go("/kreator")
     if load_user(request):
         return go("/")
-    return render(request, "login.html", next=next, error=None)
+    return render(request, "login.html", next=safe_back(next, "/"), error=None, insecure=insecure_connection(request))
 
 
 @app.post("/logowanie")
@@ -524,20 +566,23 @@ async def login_post(request: Request):
     form = await form_data(request)
     username = (form.get("username") or "").strip()
     password = form.get("password") or ""
-    nxt = form.get("next") or "/"
-    if not nxt.startswith("/") or nxt.startswith("//"):
-        nxt = "/"
+    nxt = safe_back(form.get("next"), "/")
+    insecure = insecure_connection(request)
+    wait = _throttled(request)
+    if wait:
+        return render(request, "login.html", next=nxt, username=username, error=security.wait_message(wait),
+                      insecure=insecure)
     user = db.one("SELECT * FROM users WHERE username=? COLLATE NOCASE", (username,))
-    until = _locked(user)
-    if until:
-        return render(request, "login.html", next=nxt, username=username,
-                      error=f"Konto zablokowane po zbyt wielu próbach do {until.strftime('%H:%M')}.")
+    if not user:
+        security.burn_password_check(password)  # ten sam czas odpowiedzi co dla istniejącego loginu
     if not user or not security.verify_password(password, user["password_hash"]):
-        _register_fail(user, request, f"Nieudane logowanie: {username}")
-        return render(request, "login.html", next=nxt, username=username, error="Nieprawidłowy login lub hasło.")
+        _register_fail(user, request, "Nieudane logowanie" + (f": {username[:60]}" if not user else ""))
+        return render(request, "login.html", next=nxt, username=username, error="Nieprawidłowy login lub hasło.",
+                      insecure=insecure)
     if not user["active"]:
         _register_fail(user, request, "Próba logowania na nieaktywne konto")
-        return render(request, "login.html", next=nxt, username=username, error="Konto jest wyłączone. Skontaktuj się z właścicielem.")
+        return render(request, "login.html", next=nxt, username=username,
+                      error="Konto jest wyłączone. Skontaktuj się z właścicielem.", insecure=insecure)
     if user["totp_enabled"] and user["totp_secret"] and db.get_settings().get("twofa_enabled") == "1":
         request.session["pending_uid"] = user["id"]
         request.session["pending_ts"] = time.time()
@@ -570,17 +615,15 @@ async def login_code_post(request: Request):
     if not user:
         flash(request, "Minęło zbyt dużo czasu. Zaloguj się ponownie.", "warn")
         return go("/logowanie")
-    until = _locked(user)
-    if until:
-        request.session.pop("pending_uid", None)
-        return render(request, "login.html", next="/", username=user["username"],
-                      error=f"Konto zablokowane po zbyt wielu próbach do {until.strftime('%H:%M')}.")
+    wait = _throttled(request)
+    if wait:
+        return render(request, "login_code.html", error=security.wait_message(wait))
     counter = totp.verify(user["totp_secret"], form.get("code"), user["totp_last"])
     if counter is None:
         _register_fail(user, request, "Nieprawidłowy kod logowania dwuetapowego")
         return render(request, "login_code.html", error="Nieprawidłowy kod. Sprawdź, czy czas w telefonie jest ustawiony automatycznie.")
     db.execute("UPDATE users SET totp_last=? WHERE id=?", (counter, user["id"]))
-    nxt = request.session.get("pending_next") or "/"
+    nxt = safe_back(request.session.get("pending_next"), "/")
     _start_session(request, user)
     security.audit(user, "login", None, "konto", user["id"], "Zalogowano (z kodem dwuetapowym)", ip=client_ip(request))
     return go(nxt)
@@ -593,6 +636,7 @@ async def logout(request: Request):
     if user:
         security.audit(user, "logout", None, "konto", user["id"], "Wylogowano", ip=client_ip(request))
     request.session.clear()
+    sessions.destroy(request)  # sesja znika z serwera – skopiowane ciasteczko przestaje działać
     return go("/logowanie")
 
 
@@ -601,21 +645,27 @@ def recovery_get(request: Request):
     return render(request, "recovery.html", error=None, new_code=None)
 
 
+GENERIC_RECOVERY_ERROR = "Nieprawidłowy login właściciela lub kod odzyskiwania."
+
+
 @app.post("/odzyskiwanie")
 async def recovery_post(request: Request):
     form = await form_data(request)
     username = (form.get("username") or "").strip()
     code = form.get("code") or ""
     pw, pw2 = form.get("password") or "", form.get("password2") or ""
-    user = db.one("SELECT * FROM users WHERE username=? COLLATE NOCASE AND role='owner'", (username,))
-    until = _locked(user)
-    if until:
-        return render(request, "recovery.html", username=username, new_code=None,
-                      error=f"Zbyt wiele prób. Spróbuj ponownie po {until.strftime('%H:%M')}.")
-    if not user or not security.verify_recovery_code(code, user["recovery_hash"]):
+    wait = _throttled(request)
+    if wait:
+        return render(request, "recovery.html", username=username, new_code=None, error=security.wait_message(wait))
+    # Kod działa tylko dla aktywnego właściciela. Wyłączone konto nie wróci samo przez kod odzyskiwania.
+    user = db.one("SELECT * FROM users WHERE username=? COLLATE NOCASE AND role='owner' AND active=1", (username,))
+    if not user or not user["recovery_hash"]:
+        security.burn_password_check(code)
         _register_fail(user, request, "Nieudana próba użycia kodu odzyskiwania")
-        return render(request, "recovery.html", username=username, new_code=None,
-                      error="Nieprawidłowy login właściciela lub kod odzyskiwania.")
+        return render(request, "recovery.html", username=username, new_code=None, error=GENERIC_RECOVERY_ERROR)
+    if not security.verify_recovery_code(code, user["recovery_hash"]):
+        _register_fail(user, request, "Nieudana próba użycia kodu odzyskiwania")
+        return render(request, "recovery.html", username=username, new_code=None, error=GENERIC_RECOVERY_ERROR)
     problems = security.password_problems(pw, user["username"])
     if problems or pw != pw2:
         msg = ("Hasło nie spełnia wymagań: " + ", ".join(problems) + ".") if problems else "Hasła nie są takie same."
@@ -623,22 +673,29 @@ async def recovery_post(request: Request):
     new_code = security.generate_recovery_code()
     db.execute(
         """UPDATE users SET password_hash=?, recovery_hash=?, recovery_created_at=?, must_change_password=0,
-                  failed_attempts=0, locked_until=NULL, session_version=session_version+1, active=1,
+                  failed_attempts=0, locked_until=NULL, session_version=session_version+1,
                   totp_enabled=0, totp_secret=NULL, totp_last=NULL WHERE id=?""",
         (security.hash_password(pw), security.hash_recovery_code(new_code), db.now_str(), user["id"]),
     )
+    sessions.delete_user_sessions(user["id"])
+    security.throttle_reset(client_ip(request))
     security.audit(user, "recovery", None, "konto", user["id"], "Ustawiono nowe hasło kodem odzyskiwania (logowanie dwuetapowe wyłączone – skonfiguruj je ponownie)",
                    ip=client_ip(request))
-    request.session["show_code"] = new_code
-    return render(request, "recovery.html", new_code=new_code, error=None)
+    _offer_code(request, new_code)
+    return render(request, "recovery.html", new_code=new_code, error=None, keep_code=True)
+
+
+def _offer_code(request, code):
+    """Kod do jednorazowego pobrania jako plik .txt – ważny 10 minut i tylko do następnej strony."""
+    request.session["show_code"] = {"code": code, "ts": time.time()}
 
 
 @app.get("/kod-odzyskiwania.txt")
 def code_download(request: Request):
-    code = request.session.get("show_code")
-    if not code:
-        raise HTTPException(404)
-    return _code_file(code, db.get_settings().get("company_name"))
+    item = request.session.pop("show_code", None)
+    if not isinstance(item, dict) or time.time() - item.get("ts", 0) > 600:
+        raise HTTPException(404, "Kod można pobrać tylko zaraz po jego wyświetleniu.")
+    return _code_file(item["code"], db.get_settings().get("company_name"))
 
 
 # ======================================================================
@@ -679,7 +736,10 @@ def _change_password(c, form):
         return errors
     db.execute("UPDATE users SET password_hash=?, must_change_password=0, session_version=session_version+1 WHERE id=?",
                (security.hash_password(pw), c.user["id"]))
-    c.audit("password", None, "konto", c.user["id"], "Zmiana własnego hasła")
+    # Zmiana hasła wylogowuje wszystkie inne urządzenia; bieżąca sesja dostaje nowy identyfikator.
+    sessions.delete_user_sessions(c.user["id"], except_token_hash=c.request.scope.get("nz_session_hash"))
+    sessions.rotate(c.request)
+    c.audit("password", None, "konto", c.user["id"], "Zmiana własnego hasła (inne urządzenia wylogowane)")
     c.request.session["sv"] = c.user["session_version"] + 1
     return []
 
@@ -688,7 +748,21 @@ def _change_password(c, form):
 def profile_get(request: Request):
     c = ctx(request)
     emp = db.one("SELECT * FROM employees WHERE id=?", (c.user["employee_id"],)) if c.user["employee_id"] else None
-    return render(request, "profile.html", c, errors=[], employee=emp, new_code=None)
+    return render(request, "profile.html", c, errors=[], employee=emp, new_code=None,
+                  session_count=sessions.count_user_sessions(c.user["id"]))
+
+
+@app.post("/profil/wyloguj-wszedzie")
+async def logout_everywhere(request: Request):
+    c = ctx(request)
+    await form_data(request)
+    sessions.delete_user_sessions(c.user["id"])
+    db.execute("UPDATE users SET session_version=session_version+1 WHERE id=?", (c.user["id"],))
+    c.audit("logout", None, "konto", c.user["id"], "Wylogowano na wszystkich urządzeniach")
+    request.session.clear()
+    sessions.destroy(request)
+    flash(request, "Wylogowano na wszystkich urządzeniach.")
+    return go("/logowanie")
 
 
 @app.post("/profil/dane")
@@ -712,7 +786,8 @@ async def profile_password(request: Request):
     form = await form_data(request)
     errors = _change_password(c, form)
     if errors:
-        return render(request, "profile.html", c, errors=errors, employee=None, new_code=None)
+        return render(request, "profile.html", c, errors=errors, employee=None, new_code=None,
+                      session_count=sessions.count_user_sessions(c.user["id"]))
     flash(request, "Hasło zostało zmienione.")
     return go("/profil")
 
@@ -724,14 +799,15 @@ async def profile_new_code(request: Request):
     form = await form_data(request)
     if not security.verify_password(form.get("current") or "", c.user["password_hash"]):
         return render(request, "profile.html", c, errors=["Aby wygenerować nowy kod, podaj poprawne obecne hasło."],
-                      employee=None, new_code=None)
+                      employee=None, new_code=None, session_count=sessions.count_user_sessions(c.user["id"]))
     code = security.generate_recovery_code()
     db.execute("UPDATE users SET recovery_hash=?, recovery_created_at=? WHERE id=?",
                (security.hash_recovery_code(code), db.now_str(), c.user["id"]))
     c.audit("recovery_code", None, "konto", c.user["id"], "Wygenerowano nowy kod odzyskiwania")
-    request.session["show_code"] = code
+    _offer_code(request, code)
     c.user = db.one("SELECT * FROM users WHERE id=?", (c.user["id"],))
-    return render(request, "profile.html", c, errors=[], employee=None, new_code=code)
+    return render(request, "profile.html", c, errors=[], employee=None, new_code=code, keep_code=True,
+                  session_count=sessions.count_user_sessions(c.user["id"]))
 
 
 # ======================================================================
@@ -1036,7 +1112,10 @@ def object_photo(request: Request, module: str, oid: int):
     p = config.UPLOAD_DIR / Path(obj["photo_path"]).name
     if not p.exists():
         raise HTTPException(404)
-    return FileResponse(p, headers={"Cache-Control": "private, max-age=600"})
+    mime, inline = files.serve_info(p, p.name)
+    if not mime.startswith("image/"):
+        mime, inline = "application/octet-stream", False
+    return FileResponse(p, media_type=mime, headers=files.file_headers(mime, inline, "zdjecie" + p.suffix, quote))
 
 
 # ======================================================================
@@ -1136,7 +1215,7 @@ async def term_create(request: Request):
     c.audit("create", module, "termin", tid, f"Dodano termin: {term['display_title']} – {term['object_name']} ({svc.fmt_date(term['due_date'])})",
             None, db.one("SELECT * FROM terms WHERE id=?", (tid,)))
     flash(request, "Dodano termin.")
-    return go(form.get("back") or f"/terminy/{tid}")
+    return go(safe_back(form.get("back"), f"/terminy/{tid}"))
 
 
 @app.get("/terminy/{tid}", response_class=HTMLResponse)
@@ -1201,7 +1280,7 @@ async def term_delete(request: Request, tid: int):
         remove_file(f["stored_name"])
     c.audit("delete", t["module"], "termin", tid, f"Usunięto termin: {e['display_title']} – {e['object_name']}", t, None)
     flash(request, "Usunięto termin.")
-    back = form.get("back") or (f"/m/{t['module']}/{t['object_id']}" if t["object_id"] else f"/m/{t['module']}")
+    back = safe_back(form.get("back"), f"/m/{t['module']}/{t['object_id']}" if t["object_id"] else f"/m/{t['module']}")
     return go(back)
 
 
@@ -1294,7 +1373,7 @@ async def attachment_upload(request: Request):
     n = await save_attachments(c, form, module, object_id, term_id)
     if n:
         flash(request, f"Dodano plików: {n}.")
-    return go(form.get("back") or "/")
+    return go(safe_back(form.get("back"), "/"))
 
 
 def _attachment_access(c, a, action="view"):
@@ -1317,10 +1396,10 @@ def attachment_get(request: Request, aid: int, pobierz: int = 0):
     p = config.UPLOAD_DIR / Path(a["stored_name"]).name
     if not p.exists():
         raise HTTPException(404, "Plik nie istnieje na serwerze.")
-    inline = not pobierz and (_ext(a["original_name"]) in config.IMAGE_EXTENSIONS or _ext(a["original_name"]) == ".pdf")
-    disp = "inline" if inline else "attachment"
-    return FileResponse(p, media_type=a["mime"] or "application/octet-stream",
-                        headers={"Content-Disposition": f"{disp}; filename*=UTF-8''{quote(a['original_name'])}"})
+    # Typ i sposób otwarcia ustala serwer (rozszerzenie + zawartość), nigdy typ zapisany przy wysyłce.
+    mime, inline = files.serve_info(p, a["original_name"])
+    inline = inline and not pobierz
+    return FileResponse(p, media_type=mime, headers=files.file_headers(mime, inline, a["original_name"], quote))
 
 
 @app.post("/zalaczniki/{aid}/usun")
@@ -1335,7 +1414,7 @@ async def attachment_delete(request: Request, aid: int):
     remove_file(a["stored_name"])
     c.audit("delete", a["module"], "załącznik", aid, f"Usunięto załącznik {a['original_name']}", a, None)
     flash(request, "Usunięto plik.")
-    return go(form.get("back") or "/")
+    return go(safe_back(form.get("back"), "/"))
 
 
 # ======================================================================
@@ -1350,13 +1429,18 @@ def notify_data(request: Request, tid: int):
         raise HTTPException(403, "Brak uprawnienia do powiadamiania w tym module.")
     term = svc.enrich_terms([t], c.settings)[0]
     contacts = []
+    # Pełna lista kontaktów tylko dla osób, które i tak widzą kartotekę pracowników;
+    # pozostali dostają wyłącznie osobę odpowiedzialną za ten termin.
+    full_list = c.is_owner or c.can("employees", "view")
     for e in svc.employees_brief():
+        if not full_list and e["id"] != t["responsible_employee_id"]:
+            continue
         if e["phone"] or e["email"]:
             contacts.append({"key": f"e{e['id']}", "name": f"{e['first_name']} {e['last_name']}",
                              "info": e["position"] or "pracownik", "phone": svc.normalize_phone(e["phone"]),
                              "email": e["email"] or "", "default": e["id"] == t["responsible_employee_id"]})
     for u in db.query("SELECT id, username, full_name, phone, email, employee_id FROM users WHERE active=1"):
-        if (u["phone"] or u["email"]) and not u["employee_id"]:
+        if full_list and (u["phone"] or u["email"]) and not u["employee_id"]:
             contacts.append({"key": f"u{u['id']}", "name": u["full_name"] or u["username"], "info": "użytkownik programu",
                              "phone": svc.normalize_phone(u["phone"]), "email": u["email"] or "", "default": False})
     s = c.settings
@@ -1477,7 +1561,8 @@ def panel(request: Request):
         "log": db.one("SELECT COUNT(*) n FROM audit_log")["n"],
     }
     backups = svc.list_backups()
-    return render(request, "panel/index.html", c, stats=stats, last_backup=backups[0] if backups else None)
+    return render(request, "panel/index.html", c, stats=stats, last_backup=backups[0] if backups else None,
+                  insecure=insecure_connection(request), portable=config.PORTABLE, data_dir=str(config.DATA_DIR))
 
 
 # ---------- Użytkownicy ----------
@@ -1577,7 +1662,13 @@ def user_edit(request: Request, uid: int):
     if not u:
         raise HTTPException(404)
     u["locked"] = bool(_locked(u))
-    return render(request, "panel/user_form.html", c, **_user_form_ctx(c, u, []))
+    return render(request, "panel/user_form.html", c, **_user_form_ctx(c, u, []),
+                  protected=_primary_protected(c, u), session_count=sessions.count_user_sessions(uid))
+
+
+def _primary_protected(c, target):
+    """Konto głównego właściciela edytowane przez innego właściciela – hasło, 2FA, login i e-mail są chronione."""
+    return bool(target["is_primary"]) and target["id"] != c.user["id"]
 
 
 def _owner_guard(c, target, new_role=None, new_active=None, deleting=False):
@@ -1606,17 +1697,27 @@ async def user_update(request: Request, uid: int):
         raise HTTPException(404)
     form = await form_data(request)
     u, perms, errors = _parse_user_form(form, uid)
+    if _primary_protected(c, before):
+        # Login i e-mail głównego właściciela zmienia tylko on sam (w profilu albo tutaj na własnym koncie).
+        u["username"], u["email"] = before["username"], before["email"]
+        errors = [e for e in errors if "login" not in e.lower()]
     errors += _owner_guard(c, before, u["role"], u["active"])
     if errors:
         u["id"] = uid
         u["is_primary"] = before["is_primary"]
-        return render(request, "panel/user_form.html", c, **_user_form_ctx(c, u, errors, perms))
+        return render(request, "panel/user_form.html", c, **_user_form_ctx(c, u, errors, perms),
+                      protected=_primary_protected(c, before), session_count=sessions.count_user_sessions(uid))
     before_perms = _perm_summary(security.load_permissions(before)) if before["role"] == "user" else "właściciel – pełny dostęp"
     bump = 1 if (before["active"] and not u["active"]) or before["role"] != u["role"] else 0
     db.execute("""UPDATE users SET username=?, full_name=?, email=?, phone=?, role=?, employee_id=?, active=?,
                   notify_channel=?, session_version=session_version+? WHERE id=?""",
                (u["username"], u["full_name"], u["email"], u["phone"], u["role"], u["employee_id"], u["active"],
                 u["notify_channel"], bump, uid))
+    if bump:
+        sessions.delete_user_sessions(uid)
+    if before["role"] == "owner" and (u["role"] != "owner" or not u["active"]) and before["recovery_hash"]:
+        # Wyłączenie konta lub odebranie roli właściciela unieważnia jego kod odzyskiwania.
+        db.execute("UPDATE users SET recovery_hash=NULL, recovery_created_at=NULL WHERE id=?", (uid,))
     if u["role"] == "user":
         security.save_permissions(uid, perms)
     else:
@@ -1641,11 +1742,35 @@ async def user_reset_password(request: Request, uid: int):
     if u["id"] == c.user["id"]:
         flash(request, "Własne hasło zmienisz w profilu.", "warn")
         return go(f"/panel/uzytkownicy/{uid}")
+    if _primary_protected(c, u):
+        flash(request, "Hasło głównego właściciela może zmienić tylko on sam (albo kodem odzyskiwania).", "error")
+        return go(f"/panel/uzytkownicy/{uid}")
     pw = security.generate_temp_password()
     db.execute("""UPDATE users SET password_hash=?, must_change_password=1, failed_attempts=0, locked_until=NULL,
                   session_version=session_version+1 WHERE id=?""", (security.hash_password(pw), uid))
+    sessions.delete_user_sessions(uid)
     c.audit("password_reset", None, "konto", uid, f"Nadano hasło tymczasowe dla {u['username']}")
     return render(request, "panel/temp_password.html", c, target=u, password=pw, created=False)
+
+
+@app.post("/panel/uzytkownicy/{uid}/wyloguj")
+async def user_logout_all(request: Request, uid: int):
+    c = ctx(request)
+    c.require_owner()
+    await form_data(request)
+    u = db.one("SELECT * FROM users WHERE id=?", (uid,))
+    if not u:
+        raise HTTPException(404)
+    if _primary_protected(c, u):
+        flash(request, "Głównego właściciela może wylogować tylko on sam.", "error")
+        return go(f"/panel/uzytkownicy/{uid}")
+    n = sessions.count_user_sessions(uid)
+    sessions.delete_user_sessions(uid, except_token_hash=request.scope.get("nz_session_hash"))
+    if uid != c.user["id"]:
+        db.execute("UPDATE users SET session_version=session_version+1 WHERE id=?", (uid,))
+    c.audit("logout", None, "konto", uid, f"Właściciel wylogował konto {u['username']} na wszystkich urządzeniach")
+    flash(request, f"Wylogowano konto {u['username']} (aktywnych sesji: {n}).")
+    return go(f"/panel/uzytkownicy/{uid}")
 
 
 @app.post("/panel/uzytkownicy/{uid}/odblokuj")

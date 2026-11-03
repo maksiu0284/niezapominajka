@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 APP_NAME = "Niezapominajka"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 APP_TAGLINE = "Przypominajka ważnych terminów w firmie"
 AUTHOR = "Maksymilian Staszewski"
 AUTHOR_EMAIL = "maksymilianstaszewski@gmail.com"
@@ -46,7 +46,6 @@ DB_PATH = DATA_DIR / DB_NAME
 UPLOAD_DIR = DATA_DIR / "zalaczniki"
 BACKUP_DIR = DATA_DIR / "kopie"
 TMP_DIR = DATA_DIR / "tymczasowe"
-SECRET_FILE = DATA_DIR / "klucz_sesji.txt"
 LOG_FILE = DATA_DIR / "niezapominajka.log"
 
 HOST = os.environ.get("NIEZAPOMINAJKA_HOST", "0.0.0.0")
@@ -59,9 +58,11 @@ ALLOWED_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif",
 }
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+# Wersja przenośna (exe): dane w folderze „dane” obok pliku programu.
+PORTABLE = FROZEN and os.name == "nt" and "program files" not in str(Path(sys.executable).resolve().parent).lower()
 
-LOGIN_MAX_FAILS = 5
-LOGIN_LOCK_MINUTES = 15
+LOGIN_FREE_FAILS = 5        # tyle błędów z jednego adresu bez opóźnienia
+LOGIN_MAX_DELAY = 15 * 60   # najdłuższe opóźnienie kolejnej próby (sekundy)
 SESSION_HOURS = 12
 BACKUP_KEEP = 14
 
@@ -271,7 +272,6 @@ THIRD_PARTY = [
     ("Jinja2", "BSD-3-Clause", "https://jinja.palletsprojects.com/"),
     ("Pydantic", "MIT", "https://docs.pydantic.dev/"),
     ("bcrypt", "Apache-2.0", "https://github.com/pyca/bcrypt"),
-    ("itsdangerous", "BSD-3-Clause", "https://github.com/pallets/itsdangerous"),
     ("python-multipart", "Apache-2.0", "https://github.com/Kludex/python-multipart"),
     ("openpyxl", "MIT", "https://openpyxl.readthedocs.io/"),
     ("segno (kody QR)", "BSD-3-Clause", "https://github.com/heuer/segno"),

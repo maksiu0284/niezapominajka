@@ -6,11 +6,15 @@
 <div class="crumbs"><a href="/panel">Panel</a><span>/</span><a href="/panel/uzytkownicy">Użytkownicy</a></div>
 <div class="page-head"><h1>{{ "Konto: " ~ u.username if editing else "Nowe konto" }}</h1>
   {% if editing %}<div class="page-actions">
-    {% if u.id != user.id %}
+    {% if not protected %}
+    <form method="post" action="/panel/uzytkownicy/{{ u.id }}/wyloguj" data-confirm="Wylogować konto {{ u.username }} na wszystkich urządzeniach{{ ' (oprócz tego)' if u.id == user.id }}?" data-confirm-title="Wyloguj wszędzie" data-confirm-ok="Wyloguj">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("logout") }}Wyloguj wszędzie{% if session_count %} ({{ session_count }}){% endif %}</button></form>
+    {% endif %}
+    {% if u.id != user.id and not protected %}
     <form method="post" action="/panel/uzytkownicy/{{ u.id }}/haslo" data-confirm="Nadać nowe hasło tymczasowe dla {{ u.username }}? Obecne hasło przestanie działać, a użytkownik zostanie wylogowany." data-confirm-title="Hasło tymczasowe" data-confirm-ok="Nadaj hasło">
       <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("key") }}Hasło tymczasowe</button></form>
     {% endif %}
-    {% if u.totp_enabled and u.id != user.id %}
+    {% if u.totp_enabled and u.id != user.id and not protected %}
     <form method="post" action="/panel/uzytkownicy/{{ u.id }}/2fa-reset" data-confirm="Wyłączyć logowanie dwuetapowe dla {{ u.username }} (np. po zgubieniu telefonu)? Użytkownik zostanie wylogowany." data-confirm-title="Logowanie dwuetapowe" data-confirm-ok="Wyłącz">
       <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn" type="submit">{{ icon("shield") }}Wyłącz 2FA</button></form>
     {% endif %}
@@ -27,11 +31,12 @@
   {{ errors_box(errors) }}
   <div class="form-grid">
     <div class="field"><label for="username">Login <span class="req">*</span></label>
-      <input type="text" name="username" id="username" value="{{ u.username or '' }}" autocapitalize="none" minlength="3" required></div>
+      <input type="text" name="username" id="username" value="{{ u.username or '' }}" autocapitalize="none" minlength="3" required {% if protected %}readonly{% endif %}>
+      {% if protected %}<span class="hint">Login, e-mail, hasło i logowanie dwuetapowe głównego właściciela zmienia tylko on sam.</span>{% endif %}</div>
     <div class="field"><label for="full_name">Imię i nazwisko</label>
       <input type="text" name="full_name" id="full_name" value="{{ u.full_name or '' }}"></div>
     <div class="field"><label for="email">E-mail</label>
-      <input type="email" name="email" id="email" value="{{ u.email or '' }}"></div>
+      <input type="email" name="email" id="email" value="{{ u.email or '' }}" {% if protected %}readonly{% endif %}></div>
     <div class="field"><label for="phone">Telefon (do SMS)</label>
       <input type="tel" name="phone" id="phone" value="{{ u.phone or '' }}"></div>
     <div class="field"><label for="role">Rola</label>

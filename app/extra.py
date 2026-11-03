@@ -10,7 +10,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from starlette.datastructures import UploadFile
 
-from . import config, db, importer, notify, security, services as svc, totp
+from . import config, db, importer, notify, security, services as svc, sessions, totp
 from .main import _filtered_terms, app, ctx, templates, flash, form_data, go, int_or_none, load_user, owner_exists, render
 
 
@@ -105,6 +105,7 @@ async def twofa_disable(request: Request):
         flash(request, "Podaj poprawne obecne hasło.", "error")
         return go("/profil/2fa")
     db.execute("UPDATE users SET totp_secret=NULL, totp_enabled=0, totp_last=NULL WHERE id=?", (c.user["id"],))
+    sessions.delete_user_sessions(c.user["id"], except_token_hash=request.scope.get("nz_session_hash"))
     c.audit("twofa", None, "konto", c.user["id"], "Wyłączono logowanie dwuetapowe na własnym koncie")
     flash(request, "Logowanie dwuetapowe wyłączone.")
     return go("/profil")
@@ -118,6 +119,7 @@ async def twofa_reconfigure(request: Request):
         flash(request, "Podaj poprawne obecne hasło.", "error")
         return go("/profil/2fa")
     db.execute("UPDATE users SET totp_secret=NULL, totp_enabled=0, totp_last=NULL WHERE id=?", (c.user["id"],))
+    sessions.delete_user_sessions(c.user["id"], except_token_hash=request.scope.get("nz_session_hash"))
     request.session.pop("totp_setup", None)
     c.audit("twofa", None, "konto", c.user["id"], "Rozpoczęto ponowną konfigurację logowania dwuetapowego")
     return go("/profil/2fa")
@@ -131,7 +133,11 @@ async def twofa_reset_user(request: Request, uid: int):
     u = db.one("SELECT * FROM users WHERE id=?", (uid,))
     if not u:
         raise HTTPException(404)
+    if u["is_primary"] and u["id"] != c.user["id"]:
+        flash(request, "Logowanie dwuetapowe głównego właściciela może zmienić tylko on sam (albo kodem odzyskiwania).", "error")
+        return go(f"/panel/uzytkownicy/{uid}")
     db.execute("UPDATE users SET totp_secret=NULL, totp_enabled=0, totp_last=NULL, session_version=session_version+1 WHERE id=?", (uid,))
+    sessions.delete_user_sessions(uid)
     c.audit("twofa", None, "konto", uid, f"Wyłączono logowanie dwuetapowe dla {u['username']} (np. zgubiony telefon)")
     flash(request, f"Wyłączono logowanie dwuetapowe dla {u['username']}. Przy następnym logowaniu skonfiguruje je od nowa.")
     return go(f"/panel/uzytkownicy/{uid}")
@@ -211,7 +217,8 @@ def _notify_ctx(c, errors=None, values=None):
     }
     return dict(s=s, errors=errors or [], log=notify.recent_log(100), recipients=recipients,
                 providers=config.SMS_PROVIDERS, email_ok=notify.email_configured(c.settings),
-                sms_ok=notify.sms_configured(c.settings), secrets_set={k: bool(c.settings.get(k)) for k in config.SECRET_SETTINGS})
+                sms_ok=notify.sms_configured(c.settings), secrets_set={k: bool(c.settings.get(k)) for k in config.SECRET_SETTINGS},
+                android_warning=ANDROID_HTTP_WARNING if android_insecure(c.settings) else None)
 
 
 @app.get("/panel/powiadomienia", response_class=HTMLResponse)
@@ -219,6 +226,17 @@ def notify_page(request: Request):
     c = ctx(request)
     c.require_owner()
     return render(request, "panel/notify.html", c, **_notify_ctx(c))
+
+
+ANDROID_HTTP_WARNING = ("Bramka SMS w telefonie działa przez zwykłe HTTP – login i hasło bramki oraz treść SMS idą "
+                        "przez sieć bez szyfrowania. Używaj jej tylko w zaufanej sieci firmowej albo wybierz tryb chmurowy.")
+
+
+def android_insecure(s):
+    if s.get("sms_provider") != "android" or s.get("android_mode") != "local":
+        return False
+    url = (s.get("android_url") or "").strip().lower()
+    return bool(url) and not url.startswith("https://")
 
 
 @app.post("/panel/powiadomienia")
@@ -269,6 +287,8 @@ async def notify_save(request: Request):
     c.audit("settings", None, "powiadomienia", None, "Zmieniono ustawienia powiadomień automatycznych",
             {k: before.get(k) for k in NOTIFY_KEYS}, {k: after.get(k) for k in NOTIFY_KEYS})
     flash(request, "Zapisano ustawienia powiadomień.")
+    if android_insecure(after):
+        flash(request, ANDROID_HTTP_WARNING, "warn")
     return go("/panel/powiadomienia")
 
 

@@ -1,5 +1,7 @@
 """Niezapominajka – baza danych SQLite: schemat i proste funkcje pomocnicze."""
+import os
 import sqlite3
+import sys
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -199,6 +201,27 @@ CREATE TABLE IF NOT EXISTS notification_log (
     error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_notif_ts ON notification_log(ts);
+
+-- Sesje po stronie serwera (od 1.0.2). id = skrót SHA-256 identyfikatora z ciasteczka.
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER,
+    data TEXT,
+    created_at TEXT,
+    last_seen TEXT,
+    expires_at REAL NOT NULL,
+    ip TEXT,
+    user_agent TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+-- Nieudane logowania wg adresu IP (od 1.0.2) – zamiast blokowania kont.
+CREATE TABLE IF NOT EXISTS login_throttle (
+    ip TEXT PRIMARY KEY,
+    fails INTEGER NOT NULL DEFAULT 0,
+    last_fail REAL,
+    next_allowed REAL
+);
 """
 
 
@@ -244,8 +267,21 @@ def execute(sql, params=()):
         return cur.lastrowid
 
 
+def _restrict_data_dir():
+    """Linux/AppImage: folder danych niedostępny dla innych kont systemu (bez praw dla „others”)."""
+    if os.name != "posix":
+        return
+    try:
+        mode = config.DATA_DIR.stat().st_mode & 0o777
+        if mode & 0o007:
+            os.chmod(config.DATA_DIR, mode & ~0o007)
+    except OSError:
+        pass
+
+
 def init():
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _restrict_data_dir()
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     config.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     config.TMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -259,6 +295,16 @@ def init():
                     "INSERT INTO categories(module,name,interval_value,interval_unit,sort) VALUES(?,?,?,?,?)",
                     (m, n, iv, iu, i),
                 )
+        # 1.0.2: konta nie są już blokowane po błędnych hasłach – zdejmujemy stare blokady.
+        c.execute("UPDATE users SET locked_until=NULL, failed_attempts=0 WHERE locked_until IS NOT NULL OR failed_attempts<>0")
+    # 1.0.2: klucz podpisu ciasteczek nie jest już potrzebny (sesje są na serwerze).
+    try:
+        (config.DATA_DIR / "klucz_sesji.txt").unlink(missing_ok=True)
+    except OSError:
+        pass
+    # 1.0.2: typ załączników ustalany po zawartości – poprawiamy rekordy zapisane wcześniej.
+    from . import files
+    files.fix_stored_types(sys.modules[__name__], config.UPLOAD_DIR)
 
 
 def get_settings():

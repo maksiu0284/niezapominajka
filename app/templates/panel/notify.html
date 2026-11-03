@@ -66,6 +66,7 @@
         <option value="local" {{ 'selected' if s.android_mode == 'local' }}>lokalny – telefon w sieci firmowej</option>
         <option value="cloud" {{ 'selected' if s.android_mode == 'cloud' }}>chmurowy – przez serwer api.sms-gate.app</option></select></div>
       <div class="field"><label for="android_url">Adres telefonu (tryb lokalny)</label><input type="url" name="android_url" id="android_url" value="{{ s.android_url }}" placeholder="http://192.168.1.50:8080"></div>
+      {% if android_warning %}<div class="field full"><div class="alert alert-warn">{{ icon("alert") }}<span>{{ android_warning }}</span></div></div>{% endif %}
       <div class="field"><label for="android_user">Login</label><input type="text" name="android_user" id="android_user" value="{{ s.android_user }}" autocapitalize="none" autocomplete="off"></div>
       {{ secret("android_password", "Hasło") }}
     </div>

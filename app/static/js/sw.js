@@ -1,6 +1,6 @@
 /* Niezapominajka – service worker: szybkie ładowanie plików i strona offline. */
-const CACHE = "niezapominajka-v1.0.1";
-const ASSETS = ["/static/css/app.css?v=1.0.1", "/static/js/app.js?v=1.0.1", "/static/icons/icon-192.png", "/offline"];
+const CACHE = "niezapominajka-v1.0.2";
+const ASSETS = ["/static/css/app.css?v=1.0.2", "/static/js/app.js?v=1.0.2", "/static/js/theme.js?v=1.0.2", "/static/icons/icon-192.png", "/offline"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

@@ -6,6 +6,9 @@
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="next" value="{{ next or '/' }}">
   <h1>Zaloguj się</h1>
+  {% if insecure %}
+  <div class="notice notice-warn" data-dismiss-key="http-login">{{ icon("alert") }}<span class="grow small" style="flex-basis:80%">Połączenie nie jest szyfrowane (HTTP). Hasło idzie przez sieć jawnym tekstem – loguj się tylko w zaufanej sieci firmowej albo przez dostęp zdalny z HTTPS.</span><button class="btn btn-sm btn-ghost" type="button" data-dismiss>Rozumiem, ukryj</button></div>
+  {% endif %}
   {% if error %}<div class="errors" role="alert">{{ error }}</div>{% endif %}
   <div class="field">
     <label for="username">Login</label>
